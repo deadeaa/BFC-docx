@@ -125,6 +125,20 @@ export default function AdminBatchKhususPage() {
     setIsModalOpen(true)
   }
 
+  // Auto-generate rendemen berdasarkan jumlah material (default 0)
+  const generateRendemen = (materialsCount: number): AdminBKRendemen[] => {
+    if (materialsCount < 1) return []
+    
+    const rendemen: AdminBKRendemen[] = []
+    for (let i = 0; i < materialsCount; i++) {
+      rendemen.push({
+        sort_order: i,
+        persen: 0,
+      })
+    }
+    return rendemen
+  }
+
   const handleSave = async () => {
     if (!formData.kode_produk.trim() || !formData.nama_produk.trim()) {
       setError('Kode produk dan nama produk wajib diisi')
@@ -133,11 +147,6 @@ export default function AdminBatchKhususPage() {
 
     if (formData.materials.length === 0) {
       setError('Minimal 1 material harus ditambahkan')
-      return
-    }
-
-    if (formData.rendemen.length === 0) {
-      setError('Minimal 1 rendemen harus ditambahkan')
       return
     }
 
@@ -178,17 +187,31 @@ export default function AdminBatchKhususPage() {
 
   const addMaterial = () => {
     const lastIndex = formData.materials.length
+    const newMaterials = [...formData.materials, { ...emptyMaterial(), material_index: lastIndex }]
+    
+    // Auto-generate ulang rendemen
+    const newRendemen = generateRendemen(newMaterials.length)
+    
     setFormData({
       ...formData,
-      materials: [...formData.materials, { ...emptyMaterial(), material_index: lastIndex }],
+      materials: newMaterials,
+      rendemen: newRendemen,
     })
   }
 
   const removeMaterial = (index: number) => {
-    if (formData.materials.length <= 1) return
+    // if (formData.materials.length <= 1) return
     const newMaterials = formData.materials.filter((_, i) => i !== index)
     newMaterials.forEach((m, i) => m.material_index = i)
-    setFormData({ ...formData, materials: newMaterials })
+    
+    // Auto-generate ulang rendemen
+    const newRendemen = generateRendemen(newMaterials.length)
+    
+    setFormData({
+      ...formData,
+      materials: newMaterials,
+      rendemen: newRendemen,
+    })
   }
 
   const updateMaterialDisplay = (index: number, field: 'qty_per_sachet' | 'teoritis' | 'range_min' | 'range_max', value: string) => {
@@ -254,7 +277,7 @@ export default function AdminBatchKhususPage() {
   }
 
   const removeRendemen = (index: number) => {
-    if (formData.rendemen.length <= 1) return
+    // ✅ Bisa dihapus sampai kosong
     const newRendemen = formData.rendemen.filter((_, i) => i !== index)
     newRendemen.forEach((r, i) => r.sort_order = i)
     setFormData({ ...formData, rendemen: newRendemen })
@@ -360,21 +383,11 @@ export default function AdminBatchKhususPage() {
             <table className="w-full">
               <thead>
                 <tr className={cn('border-b', isDark ? 'border-gray-700' : 'border-gray-200')}>
-                  <th className={cn('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                    Kode Produk
-                  </th>
-                  <th className={cn('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                    Nama Produk
-                  </th>
-                  <th className={cn('px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                    Materials
-                  </th>
-                  <th className={cn('px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                    Rendemen
-                  </th>
-                  <th className={cn('px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                    Aksi
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Kode Produk</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Nama Produk</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Materials</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Rendemen</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -403,16 +416,10 @@ export default function AdminBatchKhususPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}
-                        >
+                        <button onClick={() => openEditModal(p)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}>
                           <Pencil size={14} className={isDark ? 'text-gray-400' : 'text-gray-600'} />
                         </button>
-                        <button
-                          onClick={() => setDeleteTarget(p.id!)}
-                          className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}
-                        >
+                        <button onClick={() => setDeleteTarget(p.id!)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}>
                           <Trash2 size={14} className="text-red-500" />
                         </button>
                       </div>
@@ -491,13 +498,13 @@ export default function AdminBatchKhususPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className={cn('border-b', isDark ? 'border-gray-700' : 'border-gray-200')}>
-                        <th className="px-2 py-2 text-left text-xs">#</th>
-                        <th className="px-2 py-2 text-left text-xs">Kode Material</th>
-                        <th className="px-2 py-2 text-right text-xs">Qty/sachet</th>
-                        <th className="px-2 py-2 text-right text-xs">Teoritis</th>
-                        <th className="px-2 py-2 text-right text-xs">Range Min</th>
-                        <th className="px-2 py-2 text-right text-xs">Range Max</th>
-                        <th className="px-2 py-2 text-center text-xs">Aksi</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ width: '40px' }}>#</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ width: '20%' }}>Kode Material</th>
+                        <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ width: '15%' }}>Qty/sachet</th>
+                        <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ width: '15%' }}>Teoritis</th>
+                        <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ width: '15%' }}>Range Min</th>
+                        <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wider" style={{ width: '15%' }}>Range Max</th>
+                        <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ width: '50px' }}>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -510,13 +517,13 @@ export default function AdminBatchKhususPage() {
                       ) : (
                         formData.materials.map((m, i) => (
                           <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
-                            <td className="px-2 py-2 text-xs">{i + 1}</td>
+                            <td className="px-2 py-2 text-xs text-center">{i + 1}</td>
                             <td className="px-2 py-2">
                               <input
                                 type="text"
                                 value={m.kode_material}
                                 onChange={(e) => updateMaterialText(i, 'kode_material', e.target.value)}
-                                className={cn(inputBase, 'w-24')}
+                                className={cn(inputBase, 'w-full')}
                                 placeholder="MAT-001"
                               />
                             </td>
@@ -527,7 +534,7 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.materials[i]?.qty_per_sachet || '0'}
                                 onChange={(e) => updateMaterialDisplay(i, 'qty_per_sachet', e.target.value)}
                                 onBlur={() => handleMaterialBlur(i, 'qty_per_sachet')}
-                                className={cn(inputBase, 'w-20 text-right')}
+                                className={cn(inputBase, 'w-full text-right')}
                                 placeholder="0"
                               />
                             </td>
@@ -538,7 +545,7 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.materials[i]?.teoritis || '0'}
                                 onChange={(e) => updateMaterialDisplay(i, 'teoritis', e.target.value)}
                                 onBlur={() => handleMaterialBlur(i, 'teoritis')}
-                                className={cn(inputBase, 'w-20 text-right')}
+                                className={cn(inputBase, 'w-full text-right')}
                                 placeholder="0"
                               />
                             </td>
@@ -549,7 +556,7 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.materials[i]?.range_min || '0'}
                                 onChange={(e) => updateMaterialDisplay(i, 'range_min', e.target.value)}
                                 onBlur={() => handleMaterialBlur(i, 'range_min')}
-                                className={cn(inputBase, 'w-20 text-right')}
+                                className={cn(inputBase, 'w-full text-right')}
                                 placeholder="0"
                               />
                             </td>
@@ -560,17 +567,17 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.materials[i]?.range_max || '0'}
                                 onChange={(e) => updateMaterialDisplay(i, 'range_max', e.target.value)}
                                 onBlur={() => handleMaterialBlur(i, 'range_max')}
-                                className={cn(inputBase, 'w-20 text-right')}
+                                className={cn(inputBase, 'w-full text-right')}
                                 placeholder="0"
                               />
                             </td>
                             <td className="px-2 py-2 text-center">
                               <button
                                 onClick={() => removeMaterial(i)}
-                                className="text-red-500 hover:text-red-700 transition-colors"
-                                disabled={formData.materials.length <= 1}
+                                className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                // disabled={formData.materials.length <= 1}
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={16} />
                               </button>
                             </td>
                           </tr>
@@ -581,42 +588,42 @@ export default function AdminBatchKhususPage() {
                 </div>
               </div>
 
-              {/* Rendemen */}
+              {/* Rendemen - Compact */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
-                    Rendemen <span className="text-red-500">*</span>
+                    Rendemen
                     <span className="text-xs font-normal text-gray-400 ml-2">
-                      ({formData.rendemen.length} rendemen)
+                      ({formData.rendemen.length}) - auto
                     </span>
                   </label>
                   <button
                     onClick={addRendemen}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-green/10 text-brand-green hover:bg-brand-green/20 transition-colors"
                   >
-                    <Plus size={14} /> Tambah Rendemen
+                    <Plus size={14} /> Tambah
                   </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className={cn('border-b', isDark ? 'border-gray-700' : 'border-gray-200')}>
-                        <th className="px-2 py-2 text-left text-xs">#</th>
-                        <th className="px-2 py-2 text-left text-xs">Persentase (%)</th>
-                        <th className="px-2 py-2 text-center text-xs">Aksi</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ width: '40px' }}>#</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider" style={{ width: '120px' }}>Persentase (%)</th>
+                        <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider" style={{ width: '50px' }}>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
                       {formData.rendemen.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="text-center py-4 text-gray-400 text-sm">
-                            Belum ada rendemen. Klik "Tambah Rendemen"
+                            Belum ada rendemen. Klik "Tambah"
                           </td>
                         </tr>
                       ) : (
                         formData.rendemen.map((r, i) => (
                           <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
-                            <td className="px-2 py-2 text-xs">{i + 1}</td>
+                            <td className="px-2 py-2 text-xs text-center">{i + 1}</td>
                             <td className="px-2 py-2">
                               <input
                                 type="text"
@@ -624,17 +631,17 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.rendemen[i]?.persen || '0'}
                                 onChange={(e) => updateRendemenDisplay(i, e.target.value)}
                                 onBlur={() => handleRendemenBlur(i)}
-                                className={cn(inputBase, 'w-24 text-right')}
+                                className={cn(inputBase, 'w-full text-right')}
                                 placeholder="0"
+                                style={{ maxWidth: '120px' }}
                               />
                             </td>
                             <td className="px-2 py-2 text-center">
                               <button
                                 onClick={() => removeRendemen(i)}
-                                className="text-red-500 hover:text-red-700 transition-colors"
-                                disabled={formData.rendemen.length <= 1}
+                                className="text-red-500 hover:text-red-700 transition-colors p-1"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={16} />
                               </button>
                             </td>
                           </tr>
@@ -643,14 +650,17 @@ export default function AdminBatchKhususPage() {
                     </tbody>
                   </table>
                 </div>
+                <p className={cn('text-xs mt-2', isDark ? 'text-gray-400' : 'text-gray-500')}>
+                  💡 Auto generate {formData.materials.length} rendemen saat material berubah
+                </p>
               </div>
 
               {/* Info */}
               <div className={cn('p-3 rounded-lg text-xs', isDark ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-50 text-gray-500')}>
-                <p>📊 <span className="font-semibold">Preview:</span> {formData.materials.length} material, {formData.rendemen.length} rendemen</p>
+                <p>📊 {formData.materials.length} material, {formData.rendemen.length} rendemen</p>
                 <p className="mt-1">💡 Qty/sachet: digunakan untuk perhitungan</p>
-                <p className="mt-1">📌 Teoritis: hanya untuk tampilan (tidak mempengaruhi perhitungan)</p>
-                <p className="mt-1">📊 Rendemen input dalam persen (contoh: 50 untuk 50%)</p>
+                <p className="mt-1">📌 Teoritis: hanya untuk tampilan</p>
+                <p className="mt-1">🔄 Rendemen auto update saat material berubah</p>
               </div>
 
               {error && (
@@ -698,7 +708,7 @@ export default function AdminBatchKhususPage() {
               Hapus Produk?
             </h3>
             <p className={cn('text-center text-sm mb-6', isDark ? 'text-gray-400' : 'text-gray-500')}>
-              Semua data material dan rendemen yang terkait juga akan dihapus. Tindakan ini tidak bisa dibatalkan.
+              Semua data material dan rendemen yang terkait juga akan dihapus.
             </p>
             <div className="flex gap-3">
               <button

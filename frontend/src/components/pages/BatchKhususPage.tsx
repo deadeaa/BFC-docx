@@ -622,7 +622,7 @@ export default function BatchKhususPage() {
               </table>
             </div>
 
-            {/* Legenda */}
+            {/* Legenda
             <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-green-500" />
@@ -632,7 +632,7 @@ export default function BatchKhususPage() {
                 <div className={cn('w-3 h-3 rounded-sm', isDark ? 'bg-gray-700' : 'bg-gray-100')} />
                 <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Dihitung otomatis</span>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Form Simpan & Export */}

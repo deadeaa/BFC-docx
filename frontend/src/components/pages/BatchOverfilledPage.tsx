@@ -236,7 +236,7 @@ export default function BatchOverfilledPage() {
   const [inputRaws, setInputRaws] = useState<string[]>([])
   const [bobotTotalRaw, setBobotTotalRaw] = useState<string>('')
   const [noBatch, setNoBatch] = useState<string>('')
-  const [tglPembuatan, setTglPembuatan] = useState(today())
+  const [tglPembuatan] = useState(today())
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -397,7 +397,7 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
             setInputRaws(lastInputs)
             setBobotTotalRaw(reportRes.data.bobot_total?.toString() || '')
             setNoBatch(reportRes.data.no_batch || '')
-            setTglPembuatan(reportRes.data.tgl_pembuatan || today())
+            // setTglPembuatan(reportRes.data.tgl_pembuatan || today())
           }
         }
       } catch (err) {
@@ -1035,7 +1035,7 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
               </table>
             </div>
 
-            <div className="flex items-center gap-4 mt-3">
+            {/* <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-green-500" />
                 <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Input manual</span>
@@ -1044,7 +1044,7 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                 <div className={cn('w-3 h-3 rounded-sm', isDark ? 'bg-gray-700' : 'bg-gray-100')} />
                 <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Dihitung otomatis</span>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Form Simpan & Export */}
@@ -1073,9 +1073,10 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                 <input
                   type="date"
                   value={tglPembuatan}
-                  onChange={e => setTglPembuatan(e.target.value)}
-                  className={inputBase}
+                  disabled  
+                  className={cn(inputBase, 'opacity-60 cursor-not-allowed')}
                 />
+                <p className="text-xs text-gray-400 mt-1">✅ Otomatis tanggal hari ini</p>
               </div>
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -1163,7 +1164,7 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                 setInputRaws(inputs)
                 setBobotTotalRaw(report.bobot_total?.toString() || '')
                 setNoBatch(report.no_batch || '')
-                setTglPembuatan(report.tgl_pembuatan || today())
+                // setTglPembuatan(report.tgl_pembuatan || today())
                 setLatestReport(report)
                 setShowHistory(false)
               } catch (e) {
