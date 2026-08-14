@@ -46,7 +46,7 @@ func getKeysFromMapString(m map[string]map[string]interface{}) []string {
 	return keys
 }
 
-// formatFloat2 - format angka ke 2 desimal (untuk bobot, target, tambahan, dll)
+// formatFloat2 - format angka ke 2 desimal
 func formatFloat2(val interface{}) float64 {
 	if val == nil {
 		return 0
@@ -65,7 +65,7 @@ func formatFloat2(val interface{}) float64 {
 	}
 }
 
-// formatFloat3 - format angka ke 3 desimal (untuk perbandingan, ratio, nilai tertinggi)
+// formatFloat3 - format angka ke 3 desimal
 func formatFloat3(val interface{}) float64 {
 	if val == nil {
 		return 0
@@ -155,355 +155,6 @@ func (h *ReportDownloadHandler) calculateBKValues(product *models.BKProduct, inp
 }
 
 // ============================================================
-// PREPARE BO DATA
-// ============================================================
-func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string, report *models.BOReport) (map[string]interface{}, error) {
-	fmt.Printf("📦 Preparing BO data for product: %s\n", kodeProduk)
-
-	product, err := h.db.GetBOProduct(c, kodeProduk)
-	if err != nil {
-		return nil, fmt.Errorf("get product: %w", err)
-	}
-
-	data := make(map[string]interface{})
-
-	// Data umum
-	data["no_batch"] = report.NoBatch
-	data["tanggal_produksi"] = report.TglPembuatan.Format("02-01-2006")
-	data["kesimpulan"] = report.Kesimpulan
-	data["bobot_total"] = formatFloat2(report.BobotTotal)
-
-	var detail map[string]interface{}
-	if report.DetailJSON != "" {
-		if err := json.Unmarshal([]byte(report.DetailJSON), &detail); err != nil {
-			detail = make(map[string]interface{})
-		} else {
-			if val, ok := detail["nilai_tertinggi"]; ok {
-				data["nilai_tertinggi"] = formatFloat3(val)
-			}
-		}
-	} else {
-		detail = make(map[string]interface{})
-	}
-
-	// ============================================================
-	// ✅ MAPPING MATERIAL - FLEKSIBEL
-	// ============================================================
-	materialMap := make(map[string]map[string]interface{})
-
-	fmt.Printf("🔍 ===== MATERIALS FROM DATABASE =====\n")
-	for _, m := range product.Materials {
-		fmt.Printf("   ID: %d, Kode: '%s', Label: '%s', Target: %.2f\n",
-			m.ID, m.KodeMaterial, m.Label, m.TargetKg)
-	}
-	fmt.Printf("🔍 ===================================\n")
-
-	for _, m := range product.Materials {
-		key := ""
-		label := strings.ToLower(strings.TrimSpace(m.Label))
-		kode := strings.ToUpper(strings.TrimSpace(m.KodeMaterial))
-
-		fmt.Printf("🔍 Processing: label='%s', kode='%s'\n", label, kode)
-
-		// ✅ Mapping lebih fleksibel - cek berbagai kemungkinan
-		switch {
-		// SODBIC / SODBIC
-		case strings.Contains(label, "sod") ||
-			strings.Contains(label, "sodbic") ||
-			strings.Contains(label, "bicarbonate") ||
-			kode == "2AS006000J" ||
-			strings.Contains(kode, "2AS"):
-			key = "sodbic"
-			fmt.Printf("   ✅ Mapped to: sodbic\n")
-
-		// MINOR
-		case strings.Contains(label, "minor") ||
-			kode == "XEGM1" ||
-			strings.Contains(kode, "XEG"):
-			key = "minor"
-			fmt.Printf("   ✅ Mapped to: minor\n")
-
-		// CITRIC
-		case strings.Contains(label, "citric") ||
-			strings.Contains(label, "asam") ||
-			kode == "2AC006000J" ||
-			strings.Contains(kode, "2AC"):
-			key = "citric"
-			fmt.Printf("   ✅ Mapped to: citric\n")
-
-		// GULA
-		case strings.Contains(label, "gula") ||
-			strings.Contains(label, "sugar") ||
-			strings.Contains(kode, "GULA"):
-			key = "gula"
-			fmt.Printf("   ✅ Mapped to: gula\n")
-
-		default:
-			key = fmt.Sprintf("mat%d", len(materialMap))
-			fmt.Printf("   ⚠️ Unknown material, mapped to: %s\n", key)
-		}
-
-		materialMap[key] = map[string]interface{}{
-			"kode_material": m.KodeMaterial,
-			"label":         m.Label,
-			"target_kg":     m.TargetKg,
-		}
-	}
-
-	// ✅ DEBUG - lihat hasil mapping
-	fmt.Printf("🔍 ===== MAPPING RESULT =====\n")
-	for key, val := range materialMap {
-		fmt.Printf("   %s -> kode: %s, label: %s, target: %.2f\n",
-			key, val["kode_material"], val["label"], val["target_kg"])
-	}
-	fmt.Printf("🔍 ===========================\n")
-
-	// ============================================================
-	// AMBIL DATA DARI DETAIL JSON
-	// ============================================================
-	if detail != nil {
-		materials, ok := detail["materials"].([]interface{})
-		if ok {
-			fmt.Printf("🔍 ===== MATERIALS FROM DETAIL =====\n")
-			for _, m := range materials {
-				mat, ok := m.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				fmt.Printf("   Kode: %v, Label: %v, Hasil: %v, Perbandingan: %v\n",
-					mat["kode_material"], mat["label"],
-					mat["hasil_batching"], mat["perbandingan"])
-			}
-			fmt.Printf("🔍 ==================================\n")
-
-			for _, m := range materials {
-				mat, ok := m.(map[string]interface{})
-				if !ok {
-					continue
-				}
-
-				label := strings.ToLower(strings.TrimSpace(mat["label"].(string)))
-				kode := strings.ToUpper(strings.TrimSpace(mat["kode_material"].(string)))
-
-				key := ""
-
-				// Mapping dari detail - lebih fleksibel
-				switch {
-				case strings.Contains(label, "sod") ||
-					strings.Contains(label, "sodbic") ||
-					strings.Contains(label, "bicarbonate") ||
-					kode == "2AS006000J" ||
-					strings.Contains(kode, "2AS"):
-					key = "sodbic"
-				case strings.Contains(label, "minor") ||
-					kode == "XEGM1" ||
-					strings.Contains(kode, "XEG"):
-					key = "minor"
-				case strings.Contains(label, "citric") ||
-					strings.Contains(label, "asam") ||
-					kode == "2AC006000J" ||
-					strings.Contains(kode, "2AC"):
-					key = "citric"
-				case strings.Contains(label, "gula") ||
-					strings.Contains(label, "sugar") ||
-					strings.Contains(kode, "GULA"):
-					key = "gula"
-				default:
-					continue
-				}
-
-				if val, ok := materialMap[key]; ok {
-					val["hasil_batching"] = mat["hasil_batching"]
-					val["perbandingan"] = mat["perbandingan"]
-					val["ratio"] = mat["ratio"]
-					val["target_baru"] = mat["target_baru"]
-					val["tambahan_reproses"] = mat["tambahan_reproses"]
-					fmt.Printf("✅ Updated material %s from detail\n", key)
-				}
-			}
-		}
-	}
-
-	// ============================================================
-	// SET DATA KE PLACEHOLDER
-	// ============================================================
-
-	// SODIC / SODBIC
-	if val, ok := materialMap["sodbic"]; ok {
-		fmt.Printf("✅ SODBIC FOUND: target=%.2f, hasil=%.2f, perbandingan=%.2f\n",
-			val["target_kg"], val["hasil_batching"], val["perbandingan"])
-
-		hasilBatching := formatFloat2(val["hasil_batching"])
-		targetAwal := formatFloat2(val["target_kg"])
-		targetBaru := formatFloat2(val["target_baru"])
-		tambahan := formatFloat2(val["tambahan_reproses"])
-		perbandingan := formatFloat3(val["perbandingan"])
-		ratio := formatFloat3(val["ratio"])
-
-		// Dengan prefix bo_
-		data["bo_perbandingan_sodbic"] = perbandingan
-		data["bo_ratio_sodbic"] = ratio
-		data["bo_target_sodbic"] = targetAwal
-		data["bo_target_baru_sodbic"] = targetBaru
-		data["bo_tambahan_sodbic"] = tambahan
-		data["bo_hasil_batching_sodbic"] = hasilBatching
-
-		// Tanpa prefix
-		data["perbandingan_sodbic"] = perbandingan
-		data["ratio_sodbic"] = ratio
-		data["target_sodbic"] = targetAwal
-		data["target_baru_sodbic"] = targetBaru
-		data["tambahan_sodbic"] = tambahan
-		data["hasil_batching_sodbic"] = hasilBatching
-		data["perbandingan_sodbic"] = perbandingan
-		data["ratio_sodbic"] = ratio
-	} else {
-		fmt.Printf("❌ SODBIC NOT FOUND in materialMap!\n")
-		fmt.Printf("   Available keys: %v\n", getKeysFromMapString(materialMap))
-	}
-
-	// MINOR
-	if val, ok := materialMap["minor"]; ok {
-		fmt.Printf("✅ MINOR FOUND: target=%.2f, hasil=%.2f\n",
-			val["target_kg"], val["hasil_batching"])
-
-		hasilBatching := formatFloat2(val["hasil_batching"])
-		targetAwal := formatFloat2(val["target_kg"])
-		targetBaru := formatFloat2(val["target_baru"])
-		tambahan := formatFloat2(val["tambahan_reproses"])
-		perbandingan := formatFloat3(val["perbandingan"])
-		ratio := formatFloat3(val["ratio"])
-
-		data["bo_perbandingan_minor"] = perbandingan
-		data["bo_ratio_minor"] = ratio
-		data["bo_target_minor"] = targetAwal
-		data["bo_target_baru_minor"] = targetBaru
-		data["bo_tambahan_minor"] = tambahan
-		data["bo_hasil_batching_minor"] = hasilBatching
-
-		data["perbandingan_minor"] = perbandingan
-		data["ratio_minor"] = ratio
-		data["target_minor"] = targetAwal
-		data["target_baru_minor"] = targetBaru
-		data["tambahan_minor"] = tambahan
-		data["hasil_batching_minor"] = hasilBatching
-		data["perbandingan_minor"] = perbandingan
-		data["ratio_minor"] = ratio
-	} else {
-		fmt.Printf("❌ MINOR NOT FOUND in materialMap!\n")
-	}
-
-	// CITRIC
-	if val, ok := materialMap["citric"]; ok {
-		fmt.Printf("✅ CITRIC FOUND: target=%.2f, hasil=%.2f\n",
-			val["target_kg"], val["hasil_batching"])
-
-		hasilBatching := formatFloat2(val["hasil_batching"])
-		targetAwal := formatFloat2(val["target_kg"])
-		targetBaru := formatFloat2(val["target_baru"])
-		tambahan := formatFloat2(val["tambahan_reproses"])
-		perbandingan := formatFloat3(val["perbandingan"])
-		ratio := formatFloat3(val["ratio"])
-
-		data["bo_perbandingan_citric"] = perbandingan
-		data["bo_ratio_citric"] = ratio
-		data["bo_target_citric"] = targetAwal
-		data["bo_target_baru_citric"] = targetBaru
-		data["bo_tambahan_citric"] = tambahan
-		data["bo_hasil_batching_citric"] = hasilBatching
-
-		data["perbandingan_citric"] = perbandingan
-		data["ratio_citric"] = ratio
-		data["target_citric"] = targetAwal
-		data["target_baru_citric"] = targetBaru
-		data["tambahan_citric"] = tambahan
-		data["hasil_batching_citric"] = hasilBatching
-		data["perbandingan_citric"] = perbandingan
-		data["ratio_citric"] = ratio
-	} else {
-		fmt.Printf("❌ CITRIC NOT FOUND in materialMap!\n")
-	}
-
-	// GULA
-	if val, ok := materialMap["gula"]; ok {
-		fmt.Printf("✅ GULA FOUND: target=%.2f, hasil=%.2f\n",
-			val["target_kg"], val["hasil_batching"])
-
-		hasilBatching := formatFloat2(val["hasil_batching"])
-		targetAwal := formatFloat2(val["target_kg"])
-		targetBaru := formatFloat2(val["target_baru"])
-		tambahan := formatFloat2(val["tambahan_reproses"])
-		perbandingan := formatFloat3(val["perbandingan"])
-		ratio := formatFloat3(val["ratio"])
-
-		data["bo_perbandingan_gula"] = perbandingan
-		data["bo_ratio_gula"] = ratio
-		data["bo_target_gula"] = targetAwal
-		data["bo_target_baru_gula"] = targetBaru
-		data["bo_tambahan_gula"] = tambahan
-		data["bo_hasil_batching_gula"] = hasilBatching
-
-		data["perbandingan_gula"] = perbandingan
-		data["ratio_gula"] = ratio
-		data["target_gula"] = targetAwal
-		data["target_baru_gula"] = targetBaru
-		data["tambahan_gula"] = tambahan
-		data["hasil_batching_gula"] = hasilBatching
-		data["perbandingan_gula"] = perbandingan
-		data["ratio_gula"] = ratio
-	} else {
-		fmt.Printf("ℹ️ GULA not found in materialMap (optional)\n")
-	}
-
-	// Data materials untuk loop
-	materialsData := []map[string]interface{}{}
-	for _, m := range product.Materials {
-		matData := map[string]interface{}{
-			"kode_material": m.KodeMaterial,
-			"label":         m.Label,
-			"target_kg":     formatFloat2(m.TargetKg),
-		}
-
-		if detail != nil {
-			materials, ok := detail["materials"].([]interface{})
-			if ok {
-				for _, dm := range materials {
-					d, ok := dm.(map[string]interface{})
-					if !ok {
-						continue
-					}
-					if d["kode_material"] == m.KodeMaterial {
-						matData["hasil_batching"] = formatFloat2(d["hasil_batching"])
-						matData["perbandingan"] = formatFloat3(d["perbandingan"])
-						matData["ratio"] = formatFloat3(d["ratio"])
-						matData["target_baru"] = formatFloat2(d["target_baru"])
-						matData["tambahan_reproses"] = formatFloat2(d["tambahan_reproses"])
-						break
-					}
-				}
-			}
-		}
-
-		materialsData = append(materialsData, matData)
-	}
-	data["materials"] = materialsData
-
-	thresholdsData := []map[string]interface{}{}
-	for _, t := range product.Thresholds {
-		thresholdsData = append(thresholdsData, map[string]interface{}{
-			"criteria_index": t.CriteriaIndex,
-			"target_index":   t.TargetIndex,
-			"min_ratio":      t.MinRatio,
-			"max_ratio":      t.MaxRatio,
-		})
-	}
-	data["thresholds"] = thresholdsData
-
-	fmt.Printf("✅ BO Data prepared with %d keys\n", len(data))
-	return data, nil
-}
-
-// ============================================================
 // PREPARE BK DATA
 // ============================================================
 func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string, report *models.BKReport) (map[string]interface{}, error) {
@@ -516,14 +167,34 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 
 	data := make(map[string]interface{})
 
-	// Data umum - 2 desimal
+	tanggalProduksi := report.TglPembuatan.Format("02-01-2006")
+
+	// ============================================================
+	// DATA UMUM
+	// ============================================================
+	// Tanpa prefix
 	data["no_batch"] = report.NoBatch
-	data["tanggal_produksi"] = report.TglPembuatan.Format("02-01-2006")
+	data["tanggal_produksi"] = tanggalProduksi
+	data["tgl_pembuatan"] = tanggalProduksi
+	data["tanggal"] = tanggalProduksi
 	data["bobot_total"] = formatFloat2(report.BobotTotal)
 	data["input_sisa_minor"] = formatFloat2(report.InputSisaMinor)
 	data["kode_produk"] = product.KodeProduk
 	data["nama_produk"] = product.NamaProduk
 
+	// Dengan prefix bk_
+	data["bk_no_batch"] = report.NoBatch
+	data["bk_tanggal_produksi"] = tanggalProduksi
+	data["bk_tanggal"] = tanggalProduksi
+	data["bk_tgl_pembuatan"] = tanggalProduksi
+	data["bk_bobot_total"] = formatFloat2(report.BobotTotal)
+	data["bk_input_sisa_minor"] = formatFloat2(report.InputSisaMinor)
+	data["bk_kode_produk"] = product.KodeProduk
+	data["bk_nama_produk"] = product.NamaProduk
+
+	// ============================================================
+	// PARSE DETAIL JSON
+	// ============================================================
 	var detail map[string]interface{}
 	var materialValues []float64
 
@@ -667,7 +338,341 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 }
 
 // ============================================================
-// DOWNLOAD GABUNGAN BO + BK - POST /api/reports/download/combined
+// PREPARE BO DATA (untuk nanti kalau dipakai)
+// ============================================================
+func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string, report *models.BOReport) (map[string]interface{}, error) {
+	fmt.Printf("📦 Preparing BO data for product: %s\n", kodeProduk)
+
+	product, err := h.db.GetBOProduct(c, kodeProduk)
+	if err != nil {
+		return nil, fmt.Errorf("get product: %w", err)
+	}
+
+	data := make(map[string]interface{})
+
+	tanggalProduksi := report.TglPembuatan.Format("02-01-2006")
+
+	// Data umum
+	data["no_batch"] = report.NoBatch
+	data["tanggal_produksi"] = tanggalProduksi
+	data["tgl_pembuatan"] = tanggalProduksi
+	data["tanggal"] = tanggalProduksi
+	data["kesimpulan"] = report.Kesimpulan
+	data["bobot_total"] = formatFloat2(report.BobotTotal)
+
+	// Dengan prefix bo_
+	data["bo_no_batch"] = report.NoBatch
+	data["bo_tanggal_produksi"] = tanggalProduksi
+	data["bo_tanggal"] = tanggalProduksi
+	data["bo_tgl_pembuatan"] = tanggalProduksi
+	data["bo_kesimpulan"] = report.Kesimpulan
+	data["bo_bobot_total"] = formatFloat2(report.BobotTotal)
+
+	var detail map[string]interface{}
+	if report.DetailJSON != "" {
+		if err := json.Unmarshal([]byte(report.DetailJSON), &detail); err != nil {
+			detail = make(map[string]interface{})
+		} else {
+			if val, ok := detail["nilai_tertinggi"]; ok {
+				data["nilai_tertinggi"] = formatFloat3(val)
+				data["bo_nilai_tertinggi"] = formatFloat3(val)
+			}
+		}
+	} else {
+		detail = make(map[string]interface{})
+	}
+
+	materialMap := make(map[string]map[string]interface{})
+
+	for _, m := range product.Materials {
+		key := ""
+		label := strings.ToLower(strings.TrimSpace(m.Label))
+		kode := strings.ToUpper(strings.TrimSpace(m.KodeMaterial))
+
+		switch {
+		case strings.Contains(label, "sod") ||
+			strings.Contains(label, "sodbic") ||
+			strings.Contains(label, "bicarbonate") ||
+			kode == "2AS006000J" ||
+			strings.Contains(kode, "2AS"):
+			key = "sodbic"
+		case strings.Contains(label, "minor") ||
+			kode == "XEGM1" ||
+			strings.Contains(kode, "XEG"):
+			key = "minor"
+		case strings.Contains(label, "citric") ||
+			strings.Contains(label, "asam") ||
+			kode == "2AC006000J" ||
+			strings.Contains(kode, "2AC"):
+			key = "citric"
+		case strings.Contains(label, "gula") ||
+			strings.Contains(label, "sugar") ||
+			strings.Contains(kode, "GULA"):
+			key = "gula"
+		default:
+			key = fmt.Sprintf("mat%d", len(materialMap))
+		}
+
+		materialMap[key] = map[string]interface{}{
+			"kode_material": m.KodeMaterial,
+			"label":         m.Label,
+			"target_kg":     m.TargetKg,
+		}
+	}
+
+	if detail != nil {
+		materials, ok := detail["materials"].([]interface{})
+		if ok {
+			for _, m := range materials {
+				mat, ok := m.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				label := strings.ToLower(strings.TrimSpace(mat["label"].(string)))
+				kode := strings.ToUpper(strings.TrimSpace(mat["kode_material"].(string)))
+
+				key := ""
+				switch {
+				case strings.Contains(label, "sod") ||
+					strings.Contains(label, "sodbic") ||
+					strings.Contains(label, "bicarbonate") ||
+					kode == "2AS006000J" ||
+					strings.Contains(kode, "2AS"):
+					key = "sodbic"
+				case strings.Contains(label, "minor") ||
+					kode == "XEGM1" ||
+					strings.Contains(kode, "XEG"):
+					key = "minor"
+				case strings.Contains(label, "citric") ||
+					strings.Contains(label, "asam") ||
+					kode == "2AC006000J" ||
+					strings.Contains(kode, "2AC"):
+					key = "citric"
+				case strings.Contains(label, "gula") ||
+					strings.Contains(label, "sugar") ||
+					strings.Contains(kode, "GULA"):
+					key = "gula"
+				default:
+					continue
+				}
+
+				if val, ok := materialMap[key]; ok {
+					val["hasil_batching"] = mat["hasil_batching"]
+					val["perbandingan"] = mat["perbandingan"]
+					val["ratio"] = mat["ratio"]
+					val["target_baru"] = mat["target_baru"]
+					val["tambahan_reproses"] = mat["tambahan_reproses"]
+				}
+			}
+		}
+	}
+
+	// Set data ke placeholder BO
+	if val, ok := materialMap["sodbic"]; ok {
+		data["bo_perbandingan_sodbic"] = formatFloat3(val["perbandingan"])
+		data["bo_ratio_sodbic"] = formatFloat3(val["ratio"])
+		data["bo_target_sodbic"] = formatFloat2(val["target_kg"])
+		data["bo_target_baru_sodbic"] = formatFloat2(val["target_baru"])
+		data["bo_tambahan_sodbic"] = formatFloat2(val["tambahan_reproses"])
+		data["bo_hasil_batching_sodbic"] = formatFloat2(val["hasil_batching"])
+
+		data["perbandingan_sodbic"] = formatFloat3(val["perbandingan"])
+		data["ratio_sodbic"] = formatFloat3(val["ratio"])
+		data["target_sodbic"] = formatFloat2(val["target_kg"])
+		data["target_baru_sodbic"] = formatFloat2(val["target_baru"])
+		data["tambahan_sodbic"] = formatFloat2(val["tambahan_reproses"])
+		data["hasil_batching_sodbic"] = formatFloat2(val["hasil_batching"])
+	}
+
+	if val, ok := materialMap["minor"]; ok {
+		data["bo_perbandingan_minor"] = formatFloat3(val["perbandingan"])
+		data["bo_ratio_minor"] = formatFloat3(val["ratio"])
+		data["bo_target_minor"] = formatFloat2(val["target_kg"])
+		data["bo_target_baru_minor"] = formatFloat2(val["target_baru"])
+		data["bo_tambahan_minor"] = formatFloat2(val["tambahan_reproses"])
+		data["bo_hasil_batching_minor"] = formatFloat2(val["hasil_batching"])
+
+		data["perbandingan_minor"] = formatFloat3(val["perbandingan"])
+		data["ratio_minor"] = formatFloat3(val["ratio"])
+		data["target_minor"] = formatFloat2(val["target_kg"])
+		data["target_baru_minor"] = formatFloat2(val["target_baru"])
+		data["tambahan_minor"] = formatFloat2(val["tambahan_reproses"])
+		data["hasil_batching_minor"] = formatFloat2(val["hasil_batching"])
+	}
+
+	if val, ok := materialMap["citric"]; ok {
+		data["bo_perbandingan_citric"] = formatFloat3(val["perbandingan"])
+		data["bo_ratio_citric"] = formatFloat3(val["ratio"])
+		data["bo_target_citric"] = formatFloat2(val["target_kg"])
+		data["bo_target_baru_citric"] = formatFloat2(val["target_baru"])
+		data["bo_tambahan_citric"] = formatFloat2(val["tambahan_reproses"])
+		data["bo_hasil_batching_citric"] = formatFloat2(val["hasil_batching"])
+
+		data["perbandingan_citric"] = formatFloat3(val["perbandingan"])
+		data["ratio_citric"] = formatFloat3(val["ratio"])
+		data["target_citric"] = formatFloat2(val["target_kg"])
+		data["target_baru_citric"] = formatFloat2(val["target_baru"])
+		data["tambahan_citric"] = formatFloat2(val["tambahan_reproses"])
+		data["hasil_batching_citric"] = formatFloat2(val["hasil_batching"])
+	}
+
+	if val, ok := materialMap["gula"]; ok {
+		data["bo_perbandingan_gula"] = formatFloat3(val["perbandingan"])
+		data["bo_ratio_gula"] = formatFloat3(val["ratio"])
+		data["bo_target_gula"] = formatFloat2(val["target_kg"])
+		data["bo_target_baru_gula"] = formatFloat2(val["target_baru"])
+		data["bo_tambahan_gula"] = formatFloat2(val["tambahan_reproses"])
+		data["bo_hasil_batching_gula"] = formatFloat2(val["hasil_batching"])
+
+		data["perbandingan_gula"] = formatFloat3(val["perbandingan"])
+		data["ratio_gula"] = formatFloat3(val["ratio"])
+		data["target_gula"] = formatFloat2(val["target_kg"])
+		data["target_baru_gula"] = formatFloat2(val["target_baru"])
+		data["tambahan_gula"] = formatFloat2(val["tambahan_reproses"])
+		data["hasil_batching_gula"] = formatFloat2(val["hasil_batching"])
+	}
+
+	materialsData := []map[string]interface{}{}
+	for _, m := range product.Materials {
+		matData := map[string]interface{}{
+			"kode_material": m.KodeMaterial,
+			"label":         m.Label,
+			"target_kg":     formatFloat2(m.TargetKg),
+		}
+
+		if detail != nil {
+			materials, ok := detail["materials"].([]interface{})
+			if ok {
+				for _, dm := range materials {
+					d, ok := dm.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if d["kode_material"] == m.KodeMaterial {
+						matData["hasil_batching"] = formatFloat2(d["hasil_batching"])
+						matData["perbandingan"] = formatFloat3(d["perbandingan"])
+						matData["ratio"] = formatFloat3(d["ratio"])
+						matData["target_baru"] = formatFloat2(d["target_baru"])
+						matData["tambahan_reproses"] = formatFloat2(d["tambahan_reproses"])
+						break
+					}
+				}
+			}
+		}
+
+		materialsData = append(materialsData, matData)
+	}
+	data["materials"] = materialsData
+
+	return data, nil
+}
+
+// ============================================================
+// DOWNLOAD BK ONLY - POST /api/reports/download
+// ============================================================
+
+type DownloadReportRequest struct {
+	KodeProduk string `json:"kode_produk" binding:"required"`
+	BKReportID int    `json:"bk_report_id" binding:"required"`
+}
+
+func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
+	var req DownloadReportRequest
+	var err error
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("❌ Invalid request: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak valid: " + err.Error()})
+		return
+	}
+
+	fmt.Printf("📥 Downloading BK Report - Produk: %s, BK_ID: %d\n",
+		req.KodeProduk, req.BKReportID)
+
+	if req.BKReportID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Pilih report BK"})
+		return
+	}
+
+	// 1. Ambil BK report
+	bkReport, err := h.db.GetBKReportByID(c, req.BKReportID)
+	if err != nil {
+		fmt.Printf("❌ BK Report not found: ID=%d, error=%v\n", req.BKReportID, err)
+		c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
+		return
+	}
+	fmt.Printf("✅ BK Report found: %s\n", bkReport.NoBatch)
+
+	// 2. Ambil template
+	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
+	if err != nil {
+		fmt.Printf("❌ Template not found: %v\n", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"message":   "Template DOCX untuk produk " + req.KodeProduk + " belum diupload admin",
+			"kode_prod": req.KodeProduk,
+		})
+		return
+	}
+	fmt.Printf("✅ Template found: %s\n", template.FilePath)
+
+	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
+		fmt.Printf("❌ File not found: %s\n", template.FilePath)
+		c.JSON(http.StatusNotFound, gin.H{
+			"message":   "File template tidak ditemukan di server",
+			"file_path": template.FilePath,
+		})
+		return
+	}
+
+	// 3. Siapkan data BK
+	data, err := h.prepareBKData(c, req.KodeProduk, bkReport)
+	if err != nil {
+		fmt.Printf("❌ Prepare BK data error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Gagal memproses data report",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// 4. Tambahkan data tambahan
+	data["kode_produk"] = req.KodeProduk
+	data["nama_produk"] = bkReport.NamaProduk
+	data["created_by"] = bkReport.CreatedByName
+	data["tanggal_download"] = time.Now().Format("02-01-2006 15:04:05")
+
+	fmt.Printf("📊 Total data keys: %d\n", len(data))
+
+	// 5. Generate DOCX
+	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
+	if err != nil {
+		fmt.Printf("❌ Generate DOCX error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Gagal generate file report",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	fmt.Printf("✅ DOCX generated, size: %d bytes\n", len(docxBytes))
+
+	// 6. Kirim file
+	filename := fmt.Sprintf("report_BK_%s_%s.docx", req.KodeProduk, bkReport.NoBatch)
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docxBytes)
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "Report",
+		Activity:    "Download Report Batch Khusus",
+		Description: fmt.Sprintf("Download report BK untuk produk %s, batch %s", req.KodeProduk, bkReport.NoBatch),
+	})
+}
+
+// ============================================================
+// DOWNLOAD GABUNGAN BO + BK (tetap ada untuk nanti)
 // ============================================================
 
 type CombinedReportRequest struct {
@@ -694,31 +699,28 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		return
 	}
 
-	// 1. Ambil BO report
 	var boReport *models.BOReport
 	if req.BOReportID > 0 {
 		boReport, err = h.db.GetBOReportByID(c, req.BOReportID)
 		if err != nil {
-			fmt.Printf("❌ BO Report not found: ID=%d, error=%v\n", req.BOReportID, err)
+			fmt.Printf("❌ BO Report not found: ID=%d\n", req.BOReportID)
 			c.JSON(http.StatusNotFound, gin.H{"message": "BO Report tidak ditemukan"})
 			return
 		}
 		fmt.Printf("✅ BO Report found: %s\n", boReport.NoBatch)
 	}
 
-	// 2. Ambil BK report
 	var bkReport *models.BKReport
 	if req.BKReportID > 0 {
 		bkReport, err = h.db.GetBKReportByID(c, req.BKReportID)
 		if err != nil {
-			fmt.Printf("❌ BK Report not found: ID=%d, error=%v\n", req.BKReportID, err)
+			fmt.Printf("❌ BK Report not found: ID=%d\n", req.BKReportID)
 			c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
 			return
 		}
 		fmt.Printf("✅ BK Report found: %s\n", bkReport.NoBatch)
 	}
 
-	// 3. Ambil template
 	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
 	if err != nil {
 		fmt.Printf("❌ Template not found: %v\n", err)
@@ -739,17 +741,19 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		return
 	}
 
-	// 4. Siapkan data gabungan
 	data := make(map[string]interface{})
 	data["kode_produk"] = req.KodeProduk
 	data["tanggal_download"] = time.Now().Format("02-01-2006 15:04:05")
 
-	// Data BO
 	if boReport != nil {
 		boData, err := h.prepareBOData(c, req.KodeProduk, boReport)
 		if err == nil {
 			for k, v := range boData {
-				data["bo_"+k] = v
+				if strings.HasPrefix(k, "bo_") {
+					data[k] = v
+				} else {
+					data["bo_"+k] = v
+				}
 				if !strings.HasPrefix(k, "bo_") && !strings.HasPrefix(k, "bk_") {
 					data[k] = v
 				}
@@ -768,12 +772,15 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		data["bo_bobot_total"] = 0
 	}
 
-	// Data BK
 	if bkReport != nil {
 		bkData, err := h.prepareBKData(c, req.KodeProduk, bkReport)
 		if err == nil {
 			for k, v := range bkData {
-				data["bk_"+k] = v
+				if strings.HasPrefix(k, "bk_") {
+					data[k] = v
+				} else {
+					data["bk_"+k] = v
+				}
 				if !strings.HasPrefix(k, "bo_") && !strings.HasPrefix(k, "bk_") {
 					data[k] = v
 				}
@@ -794,7 +801,6 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 
 	fmt.Printf("📊 Total data keys: %d\n", len(data))
 
-	// 5. Generate DOCX
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
 		fmt.Printf("❌ Generate DOCX error: %v\n", err)
@@ -807,7 +813,6 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 
 	fmt.Printf("✅ DOCX generated, size: %d bytes\n", len(docxBytes))
 
-	// 6. Kirim file
 	filename := fmt.Sprintf("report_combined_%s.docx", req.KodeProduk)
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+filename)
@@ -822,10 +827,9 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 }
 
 // ============================================================
-// DOWNLOAD INDIVIDUAL (BO atau BK)
+// DOWNLOAD INDIVIDUAL (BO atau BK) - TETAP ADA
 // ============================================================
 
-// DownloadReport - GET /api/reports/download/:reportId
 func (h *ReportDownloadHandler) DownloadReport(c *gin.Context) {
 	reportID, err := strconv.Atoi(c.Param("reportId"))
 	if err != nil {
@@ -848,110 +852,68 @@ func (h *ReportDownloadHandler) DownloadReport(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
 }
 
-// downloadBOReport - Download BO individual
 func (h *ReportDownloadHandler) downloadBOReport(c *gin.Context, report *models.BOReport) {
 	template, err := h.db.GetReportTemplate(c, report.KodeProduk)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"message":   "Template DOCX untuk produk " + report.KodeProduk + " belum diupload admin",
-			"kode_prod": report.KodeProduk,
-		})
+		c.JSON(http.StatusNotFound, gin.H{"message": "Template DOCX untuk produk " + report.KodeProduk + " belum diupload admin"})
 		return
 	}
-
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"message":   "File template tidak ditemukan",
-			"file_path": template.FilePath,
-		})
+		c.JSON(http.StatusNotFound, gin.H{"message": "File template tidak ditemukan"})
 		return
 	}
 
 	data, err := h.prepareBOData(c, report.KodeProduk, report)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Gagal memproses data produk",
-			"error":   err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memproses data"})
 		return
 	}
-
 	data["kode_produk"] = report.KodeProduk
 	data["nama_produk"] = report.NamaProduk
 	data["created_by"] = report.CreatedByName
+	data["tanggal_download"] = time.Now().Format("02-01-2006 15:04:05")
 
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Gagal generate file report",
-			"error":   err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal generate file"})
 		return
 	}
 
 	filename := fmt.Sprintf("report_BO_%s_%s.docx", report.KodeProduk, report.NoBatch)
-	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docxBytes)
-
-	audit.Log(c, h.db, audit.Entry{
-		Menu:        "Report",
-		Activity:    "Download Report Batch Overfilled",
-		Description: fmt.Sprintf("Download report BO untuk produk %s, batch %s", report.KodeProduk, report.NoBatch),
-	})
 }
 
-// downloadBKReport - Download BK individual
 func (h *ReportDownloadHandler) downloadBKReport(c *gin.Context, report *models.BKReport) {
 	template, err := h.db.GetReportTemplate(c, report.KodeProduk)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"message":   "Template DOCX untuk produk " + report.KodeProduk + " belum diupload admin",
-			"kode_prod": report.KodeProduk,
-		})
+		c.JSON(http.StatusNotFound, gin.H{"message": "Template DOCX untuk produk " + report.KodeProduk + " belum diupload admin"})
 		return
 	}
-
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"message":   "File template tidak ditemukan",
-			"file_path": template.FilePath,
-		})
+		c.JSON(http.StatusNotFound, gin.H{"message": "File template tidak ditemukan"})
 		return
 	}
 
 	data, err := h.prepareBKData(c, report.KodeProduk, report)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Gagal memproses data produk",
-			"error":   err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memproses data"})
 		return
 	}
-
 	data["kode_produk"] = report.KodeProduk
 	data["nama_produk"] = report.NamaProduk
 	data["created_by"] = report.CreatedByName
+	data["tanggal_download"] = time.Now().Format("02-01-2006 15:04:05")
 
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Gagal generate file report",
-			"error":   err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal generate file"})
 		return
 	}
 
 	filename := fmt.Sprintf("report_BK_%s_%s.docx", report.KodeProduk, report.NoBatch)
-	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docxBytes)
-
-	audit.Log(c, h.db, audit.Entry{
-		Menu:        "Report",
-		Activity:    "Download Report Batch Khusus",
-		Description: fmt.Sprintf("Download report BK untuk produk %s, batch %s", report.KodeProduk, report.NoBatch),
-	})
 }

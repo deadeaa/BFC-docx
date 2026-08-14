@@ -91,6 +91,18 @@ func (h *BatchKhususHandler) GetProduct(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Produk tidak ditemukan"})
 		return
 	}
+	
+	// // ✅ Ambil role dari context
+	// role, _ := c.Get("role")
+	// roleStr, _ := role.(string)
+	
+	// // ✅ Jika user (bukan admin), hapus qty_per_sachet dari response
+	// if roleStr != "admin" {
+	// 	for i := range product.Materials {
+	// 		product.Materials[i].QtyPerSachet = 0
+	// 	}
+	// }
+	
 	c.JSON(http.StatusOK, product)
 }
 

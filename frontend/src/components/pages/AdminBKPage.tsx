@@ -4,12 +4,38 @@ import { Plus, Pencil, Trash2, X, Save, AlertCircle, CheckCircle2 } from 'lucide
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
-import type { AdminBKProduct, AdminBKMaterial, AdminBKRendemen } from '../../types/admin'
+
+interface AdminBKMaterial {
+  id?: number
+  product_id?: number
+  material_index: number
+  kode_material: string
+  qty_per_sachet: number
+  teoritis: number
+  range_min: number
+  range_max: number
+}
+
+interface AdminBKRendemen {
+  id?: number
+  product_id?: number
+  sort_order: number
+  persen: number
+}
+
+interface AdminBKProduct {
+  id?: number
+  kode_produk: string
+  nama_produk: string
+  materials: AdminBKMaterial[]
+  rendemen: AdminBKRendemen[]
+}
 
 const emptyMaterial = (): AdminBKMaterial => ({
   material_index: 0,
   kode_material: '',
   qty_per_sachet: 0,
+  teoritis: 0,
   range_min: 0,
   range_max: 0,
 })
@@ -40,9 +66,9 @@ export default function AdminBatchKhususPage() {
   const [success, setSuccess] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
-  // ⚡ State buat display values
+  // Display values
   const [displayValues, setDisplayValues] = useState<{
-    materials: { qty_per_sachet: string; range_min: string; range_max: string }[]
+    materials: { qty_per_sachet: string; teoritis: string; range_min: string; range_max: string }[]
     rendemen: { persen: string }[]
   }>({
     materials: [],
@@ -54,11 +80,12 @@ export default function AdminBatchKhususPage() {
     setDisplayValues({
       materials: formData.materials.map(m => ({
         qty_per_sachet: m.qty_per_sachet.toString(),
+        teoritis: m.teoritis.toString(),
         range_min: m.range_min.toString(),
         range_max: m.range_max.toString(),
       })),
       rendemen: formData.rendemen.map(r => ({
-        persen: (r.persen * 100).toFixed(2).toString(),
+        persen: (r.persen * 100).toFixed(4).toString(),
       })),
     })
   }, [formData.materials, formData.rendemen])
@@ -164,14 +191,13 @@ export default function AdminBatchKhususPage() {
     setFormData({ ...formData, materials: newMaterials })
   }
 
-  const updateMaterialDisplay = (index: number, field: 'qty_per_sachet' | 'range_min' | 'range_max', value: string) => {
+  const updateMaterialDisplay = (index: number, field: 'qty_per_sachet' | 'teoritis' | 'range_min' | 'range_max', value: string) => {
     const newDisplay = { ...displayValues }
     newDisplay.materials[index] = { ...newDisplay.materials[index], [field]: value }
     setDisplayValues(newDisplay)
   }
 
-  // ✅ Parse material - SUPPORT MINUS & ROUNDING
-  const handleMaterialBlur = (index: number, field: 'qty_per_sachet' | 'range_min' | 'range_max') => {
+  const handleMaterialBlur = (index: number, field: 'qty_per_sachet' | 'teoritis' | 'range_min' | 'range_max') => {
     const displayVal = displayValues.materials[index]?.[field] || '0'
     
     let cleanVal = displayVal.replace(/,/g, '.')
@@ -192,7 +218,6 @@ export default function AdminBatchKhususPage() {
     
     const numValue = parseFloat(cleanVal)
     if (!isNaN(numValue) && cleanVal !== '' && cleanVal !== '.' && cleanVal !== '-') {
-      // ✅ ROUND ke 4 desimal
       const roundedValue = parseFloat(numValue.toFixed(4))
       const newMaterials = [...formData.materials]
       newMaterials[index] = { ...newMaterials[index], [field]: roundedValue }
@@ -241,7 +266,6 @@ export default function AdminBatchKhususPage() {
     setDisplayValues(newDisplay)
   }
 
-  // ✅ Parse rendemen - SUPPORT MINUS & ROUNDING
   const handleRendemenBlur = (index: number) => {
     const displayVal = displayValues.rendemen[index]?.persen || '0'
     
@@ -255,13 +279,11 @@ export default function AdminBatchKhususPage() {
     
     const numValue = parseFloat(cleanVal)
     if (!isNaN(numValue) && cleanVal !== '' && cleanVal !== '.' && cleanVal !== '-') {
-      // ✅ ROUND: user input 101.5 → 1.0150 (4 desimal)
       const decimalValue = parseFloat((numValue / 100).toFixed(4))
       const newRendemen = [...formData.rendemen]
       newRendemen[index] = { ...newRendemen[index], persen: decimalValue }
       setFormData({ ...formData, rendemen: newRendemen })
       
-      // ✅ Tampilkan kembali sebagai persen dengan 4 desimal
       const newDisplay = { ...displayValues }
       newDisplay.rendemen[index] = { persen: (decimalValue * 100).toFixed(4).toString() }
       setDisplayValues(newDisplay)
@@ -295,7 +317,7 @@ export default function AdminBatchKhususPage() {
             Admin - Batch Khusus
           </h1>
           <p className={cn('text-sm mt-0.5', isDark ? 'text-gray-400' : 'text-gray-500')}>
-            Kelola produk, material, dan rendemen untuk perhitungan Batch Khusus
+            Kelola produk, material (Qty/sachet, Teoritis), dan rendemen
           </p>
         </div>
         <button
@@ -472,6 +494,7 @@ export default function AdminBatchKhususPage() {
                         <th className="px-2 py-2 text-left text-xs">#</th>
                         <th className="px-2 py-2 text-left text-xs">Kode Material</th>
                         <th className="px-2 py-2 text-right text-xs">Qty/sachet</th>
+                        <th className="px-2 py-2 text-right text-xs">Teoritis</th>
                         <th className="px-2 py-2 text-right text-xs">Range Min</th>
                         <th className="px-2 py-2 text-right text-xs">Range Max</th>
                         <th className="px-2 py-2 text-center text-xs">Aksi</th>
@@ -480,7 +503,7 @@ export default function AdminBatchKhususPage() {
                     <tbody>
                       {formData.materials.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="text-center py-4 text-gray-400 text-sm">
+                          <td colSpan={7} className="text-center py-4 text-gray-400 text-sm">
                             Belum ada material. Klik "Tambah Material"
                           </td>
                         </tr>
@@ -504,6 +527,17 @@ export default function AdminBatchKhususPage() {
                                 value={displayValues.materials[i]?.qty_per_sachet || '0'}
                                 onChange={(e) => updateMaterialDisplay(i, 'qty_per_sachet', e.target.value)}
                                 onBlur={() => handleMaterialBlur(i, 'qty_per_sachet')}
+                                className={cn(inputBase, 'w-20 text-right')}
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={displayValues.materials[i]?.teoritis || '0'}
+                                onChange={(e) => updateMaterialDisplay(i, 'teoritis', e.target.value)}
+                                onBlur={() => handleMaterialBlur(i, 'teoritis')}
                                 className={cn(inputBase, 'w-20 text-right')}
                                 placeholder="0"
                               />
@@ -614,8 +648,9 @@ export default function AdminBatchKhususPage() {
               {/* Info */}
               <div className={cn('p-3 rounded-lg text-xs', isDark ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-50 text-gray-500')}>
                 <p>📊 <span className="font-semibold">Preview:</span> {formData.materials.length} material, {formData.rendemen.length} rendemen</p>
-                <p className="mt-1">💡 Rendemen input dalam persen (contoh: 50 untuk 50%)</p>
-                <p className="mt-1">📌 Range Min-Max bisa bernilai minus (contoh: -5)</p>
+                <p className="mt-1">💡 Qty/sachet: digunakan untuk perhitungan</p>
+                <p className="mt-1">📌 Teoritis: hanya untuk tampilan (tidak mempengaruhi perhitungan)</p>
+                <p className="mt-1">📊 Rendemen input dalam persen (contoh: 50 untuk 50%)</p>
               </div>
 
               {error && (

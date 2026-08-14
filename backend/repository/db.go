@@ -1,3 +1,4 @@
+// backend/repository/repository.go
 package repository
 
 import (
@@ -372,12 +373,16 @@ CREATE TABLE IF NOT EXISTS bk_products (
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- ✅ TAMBAHKAN KOLOM TEORITIS
+ALTER TABLE bk_product_materials ADD COLUMN IF NOT EXISTS teoritis NUMERIC(12,4) DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS bk_product_materials (
     id              SERIAL        PRIMARY KEY,
     product_id      INT           NOT NULL REFERENCES bk_products(id) ON DELETE CASCADE,
     material_index  INT           NOT NULL,
     kode_material   VARCHAR(20)   NOT NULL,
     qty_per_sachet  NUMERIC(12,4) NOT NULL,
+    teoritis        NUMERIC(12,4) DEFAULT 0,
     range_min       NUMERIC(8,4)  NOT NULL,
     range_max       NUMERIC(8,4)  NOT NULL,
     UNIQUE (product_id, material_index)
@@ -397,6 +402,7 @@ CREATE TABLE IF NOT EXISTS bk_reports (
     tgl_pembuatan    DATE          NOT NULL,
     bobot_total      NUMERIC(14,4) NOT NULL,
     input_sisa_minor NUMERIC(12,4) NOT NULL,
+    detail_json      TEXT,
     created_by       INT           NOT NULL REFERENCES users(id),
     created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -509,9 +515,9 @@ func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error
 	for i, p := range products {
 		log.Printf("📦 Fetching details for product: %s (ID: %d)", p.KodeProduk, p.ID)
 
-		// Ambil materials
+		// Ambil materials - ✅ tambahkan teoritis
 		mRows, err := db.pool.Query(ctx,
-			`SELECT id, product_id, material_index, kode_material, qty_per_sachet, range_min, range_max
+			`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 			 FROM bk_product_materials 
 			 WHERE product_id = $1 
 			 ORDER BY material_index`, p.ID)
@@ -524,7 +530,7 @@ func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error
 		for mRows.Next() {
 			var m models.BKMaterial
 			if err := mRows.Scan(&m.ID, &m.ProductID, &m.MaterialIndex, &m.KodeMaterial,
-				&m.QtyPerSachet, &m.RangeMin, &m.RangeMax); err != nil {
+				&m.QtyPerSachet, &m.Teoritis, &m.RangeMin, &m.RangeMax); err != nil {
 				log.Printf("❌ Scan material error: %v", err)
 				continue
 			}
@@ -583,9 +589,9 @@ func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, 
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 
-	// Ambil materials
+	// Ambil materials - ✅ tambahkan teoritis
 	mRows, err := db.pool.Query(ctx,
-		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, range_min, range_max
+		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`, p.ID)
 	if err != nil {
 		log.Printf("❌ Query materials error: %v", err)
@@ -596,7 +602,7 @@ func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, 
 	for mRows.Next() {
 		var m models.BKMaterial
 		if err := mRows.Scan(&m.ID, &m.ProductID, &m.MaterialIndex, &m.KodeMaterial,
-			&m.QtyPerSachet, &m.RangeMin, &m.RangeMax); err != nil {
+			&m.QtyPerSachet, &m.Teoritis, &m.RangeMin, &m.RangeMax); err != nil {
 			log.Printf("❌ Scan material error: %v", err)
 			return nil, err
 		}
@@ -635,7 +641,6 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	p.Materials = []models.BKMaterial{}
 	p.Rendemen = []models.BKRendemen{}
 
-	// ✅ Ambil produk - pake TRIM dan ILIKE
 	err := db.pool.QueryRow(ctx,
 		`SELECT id, kode_produk, nama_produk 
 		 FROM bk_products 
@@ -645,13 +650,13 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 		log.Printf("❌ Query product error: %v", err)
 		return nil, fmt.Errorf("product not found: %w", err)
 	}
-	
+
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 
-	// 2. Ambil materials
+	// Ambil materials - ✅ tambahkan teoritis
 	mRows, err := db.pool.Query(ctx,
-		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, range_min, range_max
+		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`, p.ID)
 	if err != nil {
 		log.Printf("❌ Query materials error: %v", err)
@@ -662,7 +667,7 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	for mRows.Next() {
 		var m models.BKMaterial
 		if err := mRows.Scan(&m.ID, &m.ProductID, &m.MaterialIndex, &m.KodeMaterial,
-			&m.QtyPerSachet, &m.RangeMin, &m.RangeMax); err != nil {
+			&m.QtyPerSachet, &m.Teoritis, &m.RangeMin, &m.RangeMax); err != nil {
 			log.Printf("❌ Scan material error: %v", err)
 			return nil, err
 		}
@@ -670,7 +675,7 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	}
 	log.Printf("📦 Product %s has %d materials", p.KodeProduk, len(p.Materials))
 
-	// 3. Ambil rendemen
+	// Ambil rendemen
 	rRows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, sort_order, persen
 		 FROM bk_product_rendemen WHERE product_id = $1 ORDER BY sort_order`, p.ID)
@@ -693,9 +698,7 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	return &p, nil
 }
 
-// ──────────────── BATCH KHUSUS ADMIN ────────────────
-
-// CreateBKProduct - Buat produk BK baru
+// CreateBKProduct - Buat produk BK baru - ✅ tambahkan teoritis
 func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest) (*models.BKProduct, error) {
 	log.Printf("🔍 CreateBKProduct: kode=%s", req.KodeProduk)
 
@@ -714,11 +717,12 @@ func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest)
 		return nil, fmt.Errorf("insert product failed: %w", err)
 	}
 
+	// ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, range_min, range_max)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			productID, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.RangeMin, m.RangeMax)
+			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			productID, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.Teoritis, m.RangeMin, m.RangeMax)
 		if err != nil {
 			return nil, fmt.Errorf("insert material failed: %w", err)
 		}
@@ -742,7 +746,7 @@ func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest)
 	return db.GetBKProductByID(ctx, productID)
 }
 
-// UpdateBKProduct - Update produk BK yang sudah ada
+// UpdateBKProduct - Update produk BK yang sudah ada - ✅ tambahkan teoritis
 func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProductRequest) (*models.BKProduct, error) {
 	log.Printf("🔍 UpdateBKProduct: id=%d, kode=%s", id, req.KodeProduk)
 
@@ -779,12 +783,12 @@ func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProduct
 		return nil, fmt.Errorf("delete old rendemen failed: %w", err)
 	}
 
-	// Insert new materials
+	// Insert new materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, range_min, range_max)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			id, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.RangeMin, m.RangeMax)
+			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			id, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.Teoritis, m.RangeMin, m.RangeMax)
 		if err != nil {
 			return nil, fmt.Errorf("insert material failed: %w", err)
 		}

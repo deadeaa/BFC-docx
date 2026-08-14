@@ -3,7 +3,6 @@ package repository
 
 import (
 	"context"
-	// "fmt"
 
 	"bfc-backend/models"
 )
@@ -28,12 +27,12 @@ func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBK
 		return nil, err
 	}
 
-	// Insert materials
+	// Insert materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, range_min, range_max)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			productID, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.RangeMin, m.RangeMax,
+			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			productID, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.Teoritis, m.RangeMin, m.RangeMax,
 		)
 		if err != nil {
 			return nil, err
@@ -85,12 +84,12 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 		return nil, err
 	}
 
-	// Insert new materials
+	// Insert new materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, range_min, range_max)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			id, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.RangeMin, m.RangeMax,
+			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			id, m.MaterialIndex, m.KodeMaterial, m.QtyPerSachet, m.Teoritis, m.RangeMin, m.RangeMax,
 		)
 		if err != nil {
 			return nil, err
@@ -127,9 +126,9 @@ func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.Admin
 		return nil, err
 	}
 
-	// Get materials
+	// Get materials - ✅ tambahkan teoritis
 	rows, err := db.pool.Query(ctx,
-		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, range_min, range_max
+		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`,
 		id,
 	)
@@ -141,7 +140,7 @@ func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.Admin
 	for rows.Next() {
 		var m models.AdminBKProductConfig
 		if err := rows.Scan(&m.ID, &m.ProductID, &m.MaterialIndex, &m.KodeMaterial,
-			&m.QtyPerSachet, &m.RangeMin, &m.RangeMax); err != nil {
+			&m.QtyPerSachet, &m.Teoritis, &m.RangeMin, &m.RangeMax); err != nil {
 			return nil, err
 		}
 		resp.Materials = append(resp.Materials, m)
@@ -215,7 +214,6 @@ func (db *DB) CreateBOProductWithConfig(ctx context.Context, req *models.AdminBO
 	}
 	defer tx.Rollback(ctx)
 
-	// Insert product
 	var productID int
 	err = tx.QueryRow(ctx,
 		`INSERT INTO bo_products (kode_produk, nama_produk) VALUES ($1, $2) RETURNING id`,
@@ -225,7 +223,6 @@ func (db *DB) CreateBOProductWithConfig(ctx context.Context, req *models.AdminBO
 		return nil, err
 	}
 
-	// Insert materials
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bo_product_materials (product_id, material_index, kode_material, label, target_kg)
@@ -237,7 +234,6 @@ func (db *DB) CreateBOProductWithConfig(ctx context.Context, req *models.AdminBO
 		}
 	}
 
-	// Insert thresholds
 	for _, t := range req.Thresholds {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bo_product_thresholds (product_id, criteria_index, target_index, min_ratio, max_ratio)

@@ -1,3 +1,4 @@
+// frontend/src/components/pages/BatchKhususPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
 import api from '../../lib/api'
@@ -13,6 +14,7 @@ interface BKMaterial {
   material_index: number
   kode_material: string
   qty_per_sachet: number
+  teoritis: number
   range_min: number
   range_max: number
 }
@@ -70,7 +72,10 @@ function formatDateForFilename(date: string): string {
 export default function BatchKhususPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const { user } = useAuth() 
+  const { user } = useAuth()
+
+  // ✅ Cek apakah user admin
+  const isAdmin = user?.role === 'admin'
 
   const [productList, setProductList] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
@@ -80,12 +85,12 @@ export default function BatchKhususPage() {
 
   const [inputRaw, setInputRaw] = useState<string>('')
   const [noBatch, setNoBatch] = useState<string>('')
-  const [tglPembuatan, setTglPembuatan] = useState(today())
+  // ✅ Tanggal otomatis hari ini, tidak perlu input manual
+  const [tglPembuatan] = useState(today())
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
 
-  // State untuk data terakhir yang disimpan
   const [latestReport, setLatestReport] = useState<BKReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [historyData, setHistoryData] = useState<BKReport[]>([])
@@ -108,32 +113,31 @@ export default function BatchKhususPage() {
     setSaveError('')
     setFilterNoBatch('')
     setHistoryData([])
-    
+
     if (!kode) return
-    
+
     setLoadingProduct(true)
     setLoadingLatest(true)
-    
+
     try {
       const productRes = await api.get<BKProduct>(`/batch-khusus/products/${kode}`)
       setProduct(productRes.data)
-      
-      // Load latest report
+
       try {
         const reportRes = await api.get<BKReport>(`/batch-khusus/reports/latest/${kode}`)
         if (reportRes.data) {
           setLatestReport(reportRes.data)
           setInputRaw(reportRes.data.input_sisa_minor?.toString() || '')
           setNoBatch(reportRes.data.no_batch || '')
-          setTglPembuatan(reportRes.data.tgl_pembuatan || today())
+          // ✅ Tanggal tetap pakai hari ini, tapi bisa update dari report
+          // setTglPembuatan(reportRes.data.tgl_pembuatan || today()) // tidak perlu karena tgl sudah state
         }
       } catch {
         // Tidak ada laporan sebelumnya
       }
-      
-      // Load history
+
       await loadHistory(kode)
-      
+
     } catch {
       setSaveError('Gagal memuat data produk. Coba pilih ulang.')
     } finally {
@@ -161,12 +165,13 @@ export default function BatchKhususPage() {
   const materialValues = computeMaterialValues()
   const total = materialValues.reduce((s, v) => s + v, 0)
   const qtyTotal = product?.materials.reduce((s, m) => s + m.qty_per_sachet, 0) ?? 0
+  const teoritisTotal = product?.materials.reduce((s, m) => s + m.teoritis, 0) ?? 0
 
   // ── Load History ─────────────────────────────────────────────
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
     if (!targetKode) return
-    
+
     setLoadingHistory(true)
     try {
       const res = await api.get<BKReport[]>(`/batch-khusus/reports/product/${targetKode}`, {
@@ -180,7 +185,6 @@ export default function BatchKhususPage() {
     }
   }, [selectedKode, filterNoBatch])
 
-  // ── Auto-refresh history when filter changes ──────────────
   useEffect(() => {
     if (selectedKode && showHistory) {
       loadHistory(selectedKode)
@@ -189,8 +193,8 @@ export default function BatchKhususPage() {
 
   // ── Save ──────────────────────────────────────────────────────
   async function handleSave() {
-    if (!product || !tglPembuatan) {
-      setSaveError('Lengkapi Tanggal Pembuatan sebelum menyimpan.')
+    if (!product) {
+      setSaveError('Pilih produk terlebih dahulu.')
       return
     }
     if (!inputRaw || d5 <= 0) {
@@ -208,15 +212,12 @@ export default function BatchKhususPage() {
       const res = await api.post<BKReport>('/batch-khusus/reports', {
         kode_produk: product.kode_produk,
         no_batch: noBatch.trim(),
-        tgl_pembuatan: tglPembuatan,
+        tgl_pembuatan: tglPembuatan, // ✅ pakai tanggal otomatis
         bobot_total: parseFloat(total.toFixed(4)),
         input_sisa_minor: d5,
       })
       setSaveSuccess(true)
       setLatestReport(res.data)
-      // ✅ JANGAN reset input! Biarkan data tetap terlihat
-      // setInputRaw('')  // ❌ HAPUS
-      // setNoBatch('')   // ❌ HAPUS
       setTimeout(() => setSaveSuccess(false), 4000)
     } catch {
       setSaveError('Gagal menyimpan. Coba lagi.')
@@ -235,11 +236,24 @@ export default function BatchKhususPage() {
     const matHeaders = product.materials
       .map(m => `<th>${m.kode_material}</th>`).join('')
 
-    const rowQty = `
+    // ✅ ADMIN: tampilkan Qty/sachet
+    // ✅ USER: tidak ada Qty/sachet
+    let rowQty = ''
+    if (isAdmin) {
+      rowQty = `
       <tr>
         <td colspan="2" class="label">Qty/sachet</td>
         ${product.materials.map(m => `<td class="num">${fmt(m.qty_per_sachet)}</td>`).join('')}
         <td class="num bold">${fmt(qtyTotal)}</td>
+      </tr>`
+    }
+
+    // ✅ Teoritis Batching - SEMUA USER
+    const rowTeoritis = `
+      <tr>
+        <td colspan="2" class="label">Teoritis Batching</td>
+        ${product.materials.map(m => `<td class="num">${fmt(m.teoritis)}</td>`).join('')}
+        <td class="num bold">${fmt(teoritisTotal)}</td>
       </tr>`
 
     const rowSisa = `
@@ -325,6 +339,7 @@ export default function BatchKhususPage() {
   </thead>
   <tbody>
     ${rowQty}
+    ${rowTeoritis}
     ${rowSisa}
     ${rowMin}
     ${rowMax}
@@ -387,7 +402,7 @@ export default function BatchKhususPage() {
             Perhitungan Batch Khusus
           </h1>
           {latestReport && (
-            <span className={cn('text-xs ml-2 px-2 py-1 rounded', 
+            <span className={cn('text-xs ml-2 px-2 py-1 rounded',
               isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
             )}>
               Terakhir: {new Date(latestReport.created_at).toLocaleString('id-ID')}
@@ -485,18 +500,35 @@ export default function BatchKhususPage() {
                 </thead>
                 <tbody>
 
-                  {/* Qty/sachet */}
+                  {/* ✅ Qty/sachet - ADMIN SAJA */}
+                  {isAdmin && (
+                    <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
+                      <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
+                        Qty/sachet
+                      </td>
+                      {product.materials.map(m => (
+                        <td key={m.material_index} className="px-3 py-2">
+                          <div className={calcCell}>{fmt(m.qty_per_sachet)}</div>
+                        </td>
+                      ))}
+                      <td className="px-3 py-2">
+                        <div className={cn(calcCell, 'font-semibold')}>{fmt(qtyTotal)}</div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* ✅ Teoritis Batching - SEMUA USER */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
-                      Qty/sachet
+                      Teoritis Batching
                     </td>
                     {product.materials.map(m => (
                       <td key={m.material_index} className="px-3 py-2">
-                        <div className={calcCell}>{fmt(m.qty_per_sachet)}</div>
+                        <div className={calcCell}>{fmt(m.teoritis)}</div>
                       </td>
                     ))}
                     <td className="px-3 py-2">
-                      <div className={cn(calcCell, 'font-semibold')}>{fmt(qtyTotal)}</div>
+                      <div className={cn(calcCell, 'font-semibold')}>{fmt(teoritisTotal)}</div>
                     </td>
                   </tr>
 
@@ -622,6 +654,7 @@ export default function BatchKhususPage() {
                   className={inputBase}
                 />
               </div>
+              {/* ✅ Tanggal - readonly, otomatis hari ini */}
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
                   Tanggal Pembuatan <span className="text-red-500">*</span>
@@ -629,9 +662,10 @@ export default function BatchKhususPage() {
                 <input
                   type="date"
                   value={tglPembuatan}
-                  onChange={e => setTglPembuatan(e.target.value)}
-                  className={inputBase}
+                  disabled
+                  className={cn(inputBase, 'opacity-60 cursor-not-allowed')}
                 />
+                <p className="text-xs text-gray-400 mt-1">✅ Otomatis tanggal hari ini</p>
               </div>
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -662,7 +696,7 @@ export default function BatchKhususPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleSave}
-                disabled={saving || !d5 || !tglPembuatan || !noBatch.trim()}
+                disabled={saving || !d5 || !noBatch.trim()}
                 className={cn(
                   'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -714,7 +748,7 @@ export default function BatchKhususPage() {
           onSelectReport={(report: BKReport) => {
             setInputRaw(report.input_sisa_minor?.toString() || '')
             setNoBatch(report.no_batch || '')
-            setTglPembuatan(report.tgl_pembuatan || today())
+            // ✅ Tanggal tetap pakai hari ini
             setLatestReport(report)
             setShowHistory(false)
           }}

@@ -65,6 +65,7 @@ type BKMaterial struct {
 	MaterialIndex int     `json:"material_index"`
 	KodeMaterial  string  `json:"kode_material"`
 	QtyPerSachet  float64 `json:"qty_per_sachet"`
+	Teoritis      float64 `json:"teoritis"`
 	RangeMin      float64 `json:"range_min"`
 	RangeMax      float64 `json:"range_max"`
 }
@@ -187,6 +188,7 @@ type AdminBKProductConfig struct {
 	MaterialIndex int     `json:"material_index"`
 	KodeMaterial  string  `json:"kode_material"`
 	QtyPerSachet  float64 `json:"qty_per_sachet"`
+	Teoritis      float64 `json:"teoritis"`
 	RangeMin      float64 `json:"range_min"`
 	RangeMax      float64 `json:"range_max"`
 }

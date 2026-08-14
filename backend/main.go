@@ -95,7 +95,10 @@ func main() {
 		protected.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
 		// ✅ Download Individual (tetap ada)
 		protected.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
-		
+
+		// ✅ DOWNLOAD BK ONLY - POST
+		protected.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
+
 		// Simpan laporan – admin + produksi only
 		calcGroup := protected.Group("", middleware.RequireRole("admin", "produksi"))
 		{
