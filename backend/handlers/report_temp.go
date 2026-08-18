@@ -167,3 +167,32 @@ func (h *ReportTemplateHandler) DeleteTemplate(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Template berhasil dihapus"})
 }
+
+// backend/handlers/report_template_handler.go
+
+// GET /api/admin/report-templates/:id/download - Download template file
+func (h *ReportTemplateHandler) DownloadTemplate(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	template, err := h.db.GetReportTemplateByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Template tidak ditemukan"})
+		return
+	}
+
+	// Cek file ada
+	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"message": "File template tidak ditemukan"})
+		return
+	}
+
+	// Kirim file
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename="+template.NamaFile)
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	c.File(template.FilePath)
+}

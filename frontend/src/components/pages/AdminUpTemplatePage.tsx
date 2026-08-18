@@ -1,6 +1,6 @@
 // frontend/src/components/pages/admin/AdminReportTemplatePage.tsx
 import { useState, useEffect } from 'react'
-import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, Pencil, X, RefreshCw } from 'lucide-react'
+import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, Pencil, X, RefreshCw, FileDown } from 'lucide-react'
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
@@ -25,8 +25,6 @@ export default function AdminReportTemplatePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  
-  // ✅ State untuk edit mode
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editFile, setEditFile] = useState<File | null>(null)
@@ -47,7 +45,6 @@ export default function AdminReportTemplatePage() {
     fetchTemplates()
   }, [])
 
-  // ✅ Upload baru
   const handleUpload = async () => {
     if (!selectedKode || !selectedFile) {
       setError('Pilih kode produk dan file template')
@@ -78,7 +75,6 @@ export default function AdminReportTemplatePage() {
     }
   }
 
-  // ✅ EDIT - Buka modal edit
   const openEditModal = (template: Template) => {
     setEditingTemplate(template)
     setEditFile(null)
@@ -86,7 +82,6 @@ export default function AdminReportTemplatePage() {
     setIsEditModalOpen(true)
   }
 
-  // ✅ EDIT - Submit update template
   const handleEditSubmit = async () => {
     if (!editingTemplate || !editFile) {
       setError('Pilih file template baru')
@@ -102,7 +97,6 @@ export default function AdminReportTemplatePage() {
     setSuccess('')
 
     try {
-      // ✅ POST ke endpoint yang sama - auto detect update
       await api.post('/admin/report-templates', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
@@ -253,7 +247,36 @@ export default function AdminReportTemplatePage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* ✅ TOMBOL EDIT / UPDATE */}
+                        {/* ✅ Tombol Download - Download langsung */}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const response = await api.get(`/admin/report-templates/${t.id}/download`, {
+                                responseType: 'blob'
+                              })
+                              const url = window.URL.createObjectURL(new Blob([response.data]))
+                              const link = document.createElement('a')
+                              link.href = url
+                              link.download = t.nama_file
+                              document.body.appendChild(link)
+                              link.click()
+                              link.remove()
+                              window.URL.revokeObjectURL(url)
+                              setSuccess(`File ${t.nama_file} berhasil didownload!`)
+                              setTimeout(() => setSuccess(''), 3000)
+                            } catch (err) {
+                              console.error('❌ Gagal download template:', err)
+                              setError('Gagal mendownload file template')
+                            }
+                          }}
+                          className={cn(
+                            'p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium',
+                            isDark ? 'hover:bg-gray-700 text-green-400' : 'hover:bg-gray-100 text-green-600'
+                          )}
+                        >
+                          <FileDown size={14} />
+                          <span className="hidden sm:inline">Download</span>
+                        </button>
                         <button
                           onClick={() => openEditModal(t)}
                           className={cn(
@@ -284,7 +307,7 @@ export default function AdminReportTemplatePage() {
         )}
       </div>
 
-      {/* ✅ MODAL EDIT / UPDATE TEMPLATE */}
+      {/* Edit Modal */}
       {isEditModalOpen && editingTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={cn('w-full max-w-md rounded-xl shadow-2xl overflow-hidden', card)}>

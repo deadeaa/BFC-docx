@@ -1,4 +1,6 @@
-export type Role = 'admin' | 'produksi' | 'qa'
+// frontend/src/types/index.ts
+
+export type Role = 'admin' | 'ppic' | 'produksi' | 'qa' | 'ts'
 
 export interface User {
   id: number

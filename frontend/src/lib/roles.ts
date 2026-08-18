@@ -2,18 +2,26 @@
 import type { Role } from '../types'
 
 // Satu-satunya sumber label tampilan Role di seluruh aplikasi.
-// Nilai role di database/API tetap lowercase ('admin' | 'produksi' | 'qa'),
-// hanya label yang ditampilkan ke user yang diformat di sini — supaya
-// "QA" konsisten tampil dengan huruf besar semua (bukan "Qa") di mana pun
-// role ditampilkan (Badge Role, Dropdown, User Management, Login, Sign Up,
-// Sidebar, Filter, Log Aktivitas, dst).
 export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Administrator',
+  ppic: 'PPIC',
   produksi: 'Produksi',
   qa: 'QA',
+  ts: 'Technical Services',
 }
 
 export function roleLabel(role: Role | string | undefined | null): string {
   if (!role) return ''
   return ROLE_LABELS[role as Role] ?? role
+}
+
+// Role yang diizinkan untuk Sign Up mandiri
+export const SIGNUP_ROLES: Role[] = ['produksi', 'qa', 'ppic']
+
+// Role dengan akses admin (full access)
+export const ADMIN_ROLES: Role[] = ['admin', 'ts']
+
+export function isAdminRole(role: Role | string | undefined | null): boolean {
+  if (!role) return false
+  return ADMIN_ROLES.includes(role as Role)
 }

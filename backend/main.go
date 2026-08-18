@@ -5,6 +5,8 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"bfc-backend/auth"
 	"bfc-backend/config"
@@ -53,6 +55,13 @@ func main() {
 	// Gin router
 	r := gin.Default()
 
+	// Serve static files
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get working directory: %v", err)
+	}
+	r.Static("/uploads", filepath.Join(wd, "uploads"))
+
 	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{cfg.FrontendOrigin},
@@ -91,23 +100,20 @@ func main() {
 		protected.GET("/batch-overfilled/reports/product/:kode", boHandler.GetProductReports)
 		protected.GET("/batch-overfilled/reports/latest/:kode", boHandler.GetLatestReport)
 
-		// ✅ Download Gabungan BO + BK
+		// Download routes
 		protected.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
-		// ✅ Download Individual (tetap ada)
 		protected.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
-
-		// ✅ DOWNLOAD BK ONLY - POST
 		protected.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
 
-		// Simpan laporan – admin + produksi only
-		calcGroup := protected.Group("", middleware.RequireRole("admin", "produksi"))
+		// Simpan laporan – admin, ts, produksi
+		calcGroup := protected.Group("", middleware.RequireRole("admin", "ts", "produksi"))
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
 			calcGroup.POST("/batch-overfilled/reports", boHandler.CreateReport)
 		}
 
-		// Admin only routes
-		adminGroup := protected.Group("", middleware.RequireRole("admin"))
+		// Admin & TS only routes (full access)
+		adminGroup := protected.Group("", middleware.AdminOrTSOnly())
 		{
 			// User management
 			adminGroup.GET("/users", userHandler.List)
@@ -137,11 +143,12 @@ func main() {
 			adminGroup.PUT("/admin/bo/products/:id", adminHandler.UpdateBOProduct)
 			adminGroup.DELETE("/admin/bo/products/:id", adminHandler.DeleteBOProduct)
 
-			// ✅ Report Template - HANYA SEKALI
+			// Report Template - FULL CRUD + Download
 			adminGroup.GET("/admin/report-templates", reportTemplateHandler.ListTemplates)
 			adminGroup.POST("/admin/report-templates", reportTemplateHandler.UploadTemplate)
 			adminGroup.GET("/admin/report-templates/:id", reportTemplateHandler.GetTemplate)
 			adminGroup.DELETE("/admin/report-templates/:id", reportTemplateHandler.DeleteTemplate)
+			adminGroup.GET("/admin/report-templates/:id/download", reportTemplateHandler.DownloadTemplate)
 		}
 	}
 

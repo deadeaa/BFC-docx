@@ -10,9 +10,21 @@ type Role string
 
 const (
 	RoleAdmin    Role = "admin"
+	RolePPIC     Role = "ppic"
 	RoleProduksi Role = "produksi"
 	RoleQA       Role = "qa"
+	RoleTS       Role = "ts" // Technical Support - memiliki akses seperti admin
 )
+
+// IsAdminOrTS mengecek apakah role memiliki akses admin penuh
+func (r Role) IsAdminOrTS() bool {
+	return r == RoleAdmin || r == RoleTS
+}
+
+// IsSignupAllowed mengecek apakah role diizinkan untuk signup mandiri
+func (r Role) IsSignupAllowed() bool {
+	return r == RoleProduksi || r == RoleQA || r == RolePPIC
+}
 
 type User struct {
 	ID        int       `json:"id"`
@@ -142,10 +154,9 @@ type BOProduct struct {
 	NamaProduk string        `json:"nama_produk"`
 	Materials  []BOMaterial  `json:"materials"`
 	Thresholds []BOThreshold `json:"thresholds"`
-	CreatedAt  time.Time     `json:"created_at,omitempty"` // ✅ Tambahkan
-	UpdatedAt  time.Time     `json:"updated_at,omitempty"` // ✅ Tambahkan
+	CreatedAt  time.Time     `json:"created_at,omitempty"`
+	UpdatedAt  time.Time     `json:"updated_at,omitempty"`
 }
-
 
 type BOReport struct {
 	ID            int       `json:"id"`
@@ -181,7 +192,6 @@ type CreateBOReportRequest struct {
 // ── ADMIN CONFIG MODELS ──────────────────────────────────────
 // ──────────────────────────────────────────────────────────────
 
-// AdminBKProductConfig untuk konfigurasi produk Batch Khusus
 type AdminBKProductConfig struct {
 	ID            int     `json:"id"`
 	ProductID     int     `json:"product_id"`
@@ -218,19 +228,18 @@ type AdminBOThresholdConfig struct {
 	MaxRatio      float64 `json:"max_ratio"`
 }
 
-// AdminBKProductRequest untuk create/update produk Batch Khusus
 type AdminBKProductRequest struct {
-	KodeProduk string                 `json:"kode_produk" binding:"required"`
-	NamaProduk string                 `json:"nama_produk" binding:"required"`
-	Materials  []AdminBKProductConfig `json:"materials"`
-	Rendemen   []AdminBKRendemenConfig `json:"rendemen"`
+	KodeProduk string                    `json:"kode_produk" binding:"required"`
+	NamaProduk string                    `json:"nama_produk" binding:"required"`
+	Materials  []AdminBKProductConfig    `json:"materials"`
+	Rendemen   []AdminBKRendemenConfig   `json:"rendemen"`
 }
 
 type AdminBOProductRequest struct {
-	KodeProduk string                   `json:"kode_produk" binding:"required"`
-	NamaProduk string                   `json:"nama_produk" binding:"required"`
-	Materials  []AdminBOProductConfig   `json:"materials"`
-	Thresholds []AdminBOThresholdConfig `json:"thresholds"`
+	KodeProduk string                     `json:"kode_produk" binding:"required"`
+	NamaProduk string                     `json:"nama_produk" binding:"required"`
+	Materials  []AdminBOProductConfig     `json:"materials"`
+	Thresholds []AdminBOThresholdConfig   `json:"thresholds"`
 }
 
 type AdminBKProductResponse struct {

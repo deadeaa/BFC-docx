@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.tsx
 import {
   createContext,
   useContext,
@@ -8,6 +9,7 @@ import {
 } from 'react'
 import api from '../lib/api'
 import type { User, Role } from '../types'
+import { isAdminRole } from '../lib/roles'
 
 interface AuthContextType {
   user: User | null
@@ -15,6 +17,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   hasRole: (...roles: Role[]) => boolean
+  isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -67,8 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   )
 
+  const isAdmin = user ? isAdminRole(user.role) : false
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, hasRole, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )

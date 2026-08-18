@@ -4,10 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, UserPlus, CheckCircle2 } from 'lucide-react'
 import api from '../../lib/api'
 import type { Role } from '../../types'
-import { roleLabel } from '../../lib/roles'
-
-// Role yang boleh dipilih saat Sign Up mandiri — TIDAK termasuk Administrator.
-const SIGNUP_ROLES: Role[] = ['produksi', 'qa']
+import { roleLabel, SIGNUP_ROLES } from '../../lib/roles'
 
 export default function SignUpPage() {
   const navigate = useNavigate()
@@ -219,7 +216,7 @@ export default function SignUpPage() {
       `}</style>
 
       <div className="bfc-login-root">
-        {/* ── LEFT — Hero Section (identik dengan Login) ─────────── */}
+        {/* LEFT - Hero Section */}
         <div className="bfc-login-left bfc-hero">
           <svg
             aria-hidden
@@ -278,7 +275,7 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        {/* ── RIGHT — Form Sign Up (identik dengan Login, isi form berbeda) ─── */}
+        {/* RIGHT - Form Sign Up */}
         <div className="bfc-login-right">
           <div className="bfc-form bfc-form-card" style={{ width: '100%', maxWidth: '380px' }}>
             {success ? (
@@ -439,7 +436,7 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Role */}
+                  {/* Role - Hanya menampilkan role yang diizinkan untuk signup */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',

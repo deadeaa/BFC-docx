@@ -1,3 +1,4 @@
+// backend/middleware/auth.go
 package middleware
 
 import (
@@ -14,9 +15,7 @@ const CtxUserID = "user_id"
 const CtxUsername = "username"
 const CtxRole = "role"
 
-// Auth validates the JWT access token and checks idle timeout by comparing
-// against the session's last_activity (passed via X-Session-ID header or stored separately).
-// For simplicity, idle check is enforced only at the refresh endpoint.
+// Auth validates the JWT access token
 func Auth(jwtSvc *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -49,6 +48,31 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 			}
 		}
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
+	}
+}
+
+// AdminOrTSOnly middleware untuk membatasi akses hanya untuk Admin dan TS
+func AdminOrTSOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get(CtxRole)
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
+			return
+		}
+		
+		roleStr, ok := role.(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
+			return
+		}
+		
+		// Admin atau TS yang memiliki akses penuh
+		if roleStr != "admin" && roleStr != "ts" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
+			return
+		}
+		
+		c.Next()
 	}
 }
 
