@@ -58,7 +58,6 @@ interface BKReport {
 function fmt(v: number | null | undefined, decimals = 3): string {
   if (v == null || isNaN(v)) return '-'
   const formatted = v.toFixed(decimals)
-  // Hilangkan trailing zeros tapi tetap pertahankan angka desimal yang有意义
   return formatted.replace(/\.?0+$/, '')
 }
 
@@ -167,6 +166,23 @@ export default function BatchKhususPage() {
   const qtyTotal = product?.materials.reduce((s, m) => s + m.qty_per_sachet, 0) ?? 0
   const teoritisTotal = product?.materials.reduce((s, m) => s + m.teoritis, 0) ?? 0
 
+  // ── Hitung Range Batching ──────────────────────────────────
+  // Range Min = Material Value - range_min (per material)
+  // Range Max = Material Value - range_max (per material)
+  function computeRangeValues(): { min: number[]; max: number[] } {
+    if (!product || d5 <= 0) {
+      return { 
+        min: product?.materials.map(() => 0) || [], 
+        max: product?.materials.map(() => 0) || [] 
+      }
+    }
+    const minValues = materialValues.map((v, i) => v - product.materials[i].range_min)
+    const maxValues = materialValues.map((v, i) => v - product.materials[i].range_max)
+    return { min: minValues, max: maxValues }
+  }
+
+  const rangeValues = computeRangeValues()
+
   // ── Load History ─────────────────────────────────────────────
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
@@ -266,18 +282,20 @@ export default function BatchKhususPage() {
         <td class="num bold">${fmt(total)}</td>
       </tr>`
 
-    // Range
+    // Range Min - HASIL PERHITUNGAN: Material Value - range_min
     const rowMin = `
       <tr>
         <td rowspan="2" class="label">Range Batching</td>
         <td class="sub">Min</td>
-        ${product.materials.map(m => `<td class="num">${fmt(m.range_min)}</td>`).join('')}
+        ${rangeValues.min.map(v => `<td class="num">${fmt(v)}</td>`).join('')}
         <td class="num gray">—</td>
       </tr>`
+
+    // Range Max - HASIL PERHITUNGAN: Material Value - range_max
     const rowMax = `
       <tr>
         <td class="sub">Max</td>
-        ${product.materials.map(m => `<td class="num">${fmt(m.range_max)}</td>`).join('')}
+        ${rangeValues.max.map(v => `<td class="num">${fmt(v)}</td>`).join('')}
         <td class="num gray">—</td>
       </tr>`
 
@@ -564,26 +582,30 @@ export default function BatchKhususPage() {
                     </td>
                   </tr>
 
-                  {/* Range Min */}
+                  {/* Range Min - HASIL PERHITUNGAN: Material Value - range_min */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} rowSpan={2}>
                       Range Batching
                     </td>
                     <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>Min</td>
-                    {product.materials.map(m => (
-                      <td key={m.material_index} className="px-3 py-2">
-                        <div className={calcCell}>{fmt(m.range_min)}</div>
+                    {rangeValues.min.map((v, i) => (
+                      <td key={i} className="px-3 py-2">
+                        <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
+                          {d5 > 0 ? fmt(v) : '0'}
+                        </div>
                       </td>
                     ))}
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
                   </tr>
 
-                  {/* Range Max */}
+                  {/* Range Max - HASIL PERHITUNGAN: Material Value - range_max */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>Max</td>
-                    {product.materials.map(m => (
-                      <td key={m.material_index} className="px-3 py-2">
-                        <div className={calcCell}>{fmt(m.range_max)}</div>
+                    {rangeValues.max.map((v, i) => (
+                      <td key={i} className="px-3 py-2">
+                        <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
+                          {d5 > 0 ? fmt(v) : '0'}
+                        </div>
                       </td>
                     ))}
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
@@ -603,8 +625,8 @@ export default function BatchKhususPage() {
                       <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>
                         {(r.persen * 100).toFixed(2)}%
                       </td>
-                      {product.materials.map(m => (
-                        <td key={m.material_index} className="px-3 py-2">
+                      {product.materials.map(() => (
+                        <td key={r.id} className="px-3 py-2">
                           <div className={grayCell}>—</div>
                         </td>
                       ))}

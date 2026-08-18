@@ -155,7 +155,7 @@ func (h *ReportDownloadHandler) calculateBKValues(product *models.BKProduct, inp
 }
 
 // ============================================================
-// PREPARE BK DATA
+// PREPARE BK DATA - DENGAN RANGE HASIL PERHITUNGAN
 // ============================================================
 func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string, report *models.BKReport) (map[string]interface{}, error) {
 	fmt.Printf("📦 Preparing BK data for product: %s\n", kodeProduk)
@@ -172,7 +172,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	// ============================================================
 	// DATA UMUM
 	// ============================================================
-	// Tanpa prefix
 	data["no_batch"] = report.NoBatch
 	data["tanggal_produksi"] = tanggalProduksi
 	data["tgl_pembuatan"] = tanggalProduksi
@@ -182,7 +181,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	data["kode_produk"] = product.KodeProduk
 	data["nama_produk"] = product.NamaProduk
 
-	// Dengan prefix bk_
 	data["bk_no_batch"] = report.NoBatch
 	data["bk_tanggal_produksi"] = tanggalProduksi
 	data["bk_tanggal"] = tanggalProduksi
@@ -243,7 +241,9 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	}
 
 	// ============================================================
-	// DATA MATERIAL - SUPPORT INDEX 0, 1, 2, 3, DAN SETERUSNYA
+	// DATA MATERIAL - DENGAN RANGE HASIL PERHITUNGAN
+	// Range Min = Material Value - range_min
+	// Range Max = Material Value - range_max
 	// ============================================================
 	materialsData := []map[string]interface{}{}
 	for idx, m := range product.Materials {
@@ -256,8 +256,17 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 			hasil = 0
 		}
 
-		rangeMin := formatFloat2(m.RangeMin)
-		rangeMax := formatFloat2(m.RangeMax)
+		// ✅ FIX: Range Min = Material Value - range_min
+		// ✅ FIX: Range Max = Material Value - range_max
+		var rangeMin, rangeMax float64
+		if idx < len(materialValues) {
+			rangeMin = formatFloat2(materialValues[idx] - m.RangeMin)
+			rangeMax = formatFloat2(materialValues[idx] - m.RangeMax)
+		} else {
+			rangeMin = formatFloat2(0 - m.RangeMin)
+			rangeMax = formatFloat2(0 - m.RangeMax)
+		}
+
 		qty := formatFloat2(m.QtyPerSachet)
 
 		// Dengan prefix bk_
@@ -283,7 +292,7 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 			"hasil":          hasil,
 		})
 
-		fmt.Printf("📊 BK Material %d: %s = %.2f\n", idx, m.KodeMaterial, hasil)
+		fmt.Printf("📊 BK Material %d: %s, Range Min: %.2f, Range Max: %.2f\n", idx, m.KodeMaterial, rangeMin, rangeMax)
 	}
 	data["materials"] = materialsData
 
