@@ -52,6 +52,26 @@ const emptyProduct = (): AdminBOProduct => ({
   thresholds: [],
 })
 
+// ── Helper untuk generate default material name ──────────────
+
+function getDefaultMaterialName(index: number, kodeProduk: string): { kode_material: string; label: string } {
+  switch (index) {
+    case 0:
+      return { kode_material: '2AS006000J', label: 'Sodbic' }
+    case 1:
+      if (kodeProduk && kodeProduk.length > 0) {
+        return { kode_material: 'X' + kodeProduk.slice(1), label: 'Minor' }
+      }
+      return { kode_material: '', label: 'Minor' }
+    case 2:
+      return { kode_material: '2AC006000J', label: 'Citric' }
+    case 3:
+      return { kode_material: '2AS012000J', label: 'Gula' }
+    default:
+      return { kode_material: '', label: '' }
+  }
+}
+
 export default function AdminBatchOverfilledPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -128,9 +148,16 @@ export default function AdminBatchOverfilledPage() {
   }
 
   // ── Material Handlers ──────────────────────────────────────
+  
   const addMaterial = () => {
     const lastIndex = formData.materials.length
-    const newMaterials = [...formData.materials, { ...emptyMaterial(), material_index: lastIndex }]
+    const defaultData = getDefaultMaterialName(lastIndex, formData.kode_produk)
+    const newMaterials = [...formData.materials, { 
+      ...emptyMaterial(), 
+      material_index: lastIndex,
+      kode_material: defaultData.kode_material,
+      label: defaultData.label,
+    }]
     
     // ✅ Auto-generate ulang thresholds
     const newThresholds = generateThresholds(newMaterials.length)
@@ -142,11 +169,31 @@ export default function AdminBatchOverfilledPage() {
     })
   }
 
+  const handleKodeProdukChange = (newKode: string) => {
+    const upperKode = newKode.toUpperCase()
+    setFormData({ ...formData, kode_produk: upperKode })
+    
+    // Update material index 1 jika ada
+    const materialIndex1 = formData.materials.findIndex(m => m.material_index === 1)
+    if (materialIndex1 !== -1) {
+      const currentMaterial = formData.materials[materialIndex1]
+      const defaultData = getDefaultMaterialName(1, upperKode)
+      
+      if (!currentMaterial.kode_material || 
+          currentMaterial.kode_material.startsWith('X') ||
+          currentMaterial.kode_material === getDefaultMaterialName(1, formData.kode_produk).kode_material) {
+        const newMaterials = [...formData.materials]
+        newMaterials[materialIndex1] = { 
+          ...newMaterials[materialIndex1], 
+          kode_material: defaultData.kode_material,
+          label: defaultData.label,
+        }
+        setFormData(prev => ({ ...prev, materials: newMaterials }))
+      }
+    }
+  }
+
   const removeMaterial = (index: number) => {
-    // if (formData.materials.length <= 1) {
-    //   setError('Minimal 1 material')
-    //   return
-    // }
     const newMaterials = formData.materials.filter((_, i) => i !== index)
     newMaterials.forEach((m, i) => m.material_index = i)
     
@@ -176,7 +223,6 @@ export default function AdminBatchOverfilledPage() {
   }
 
   const removeThreshold = (index: number) => {
-    // ✅ Bisa dihapus sampai kosong
     const newThresholds = formData.thresholds.filter((_, i) => i !== index)
     setFormData({ ...formData, thresholds: newThresholds })
   }
@@ -387,7 +433,7 @@ export default function AdminBatchOverfilledPage() {
                   <input
                     type="text"
                     value={formData.kode_produk}
-                    onChange={(e) => setFormData({ ...formData, kode_produk: e.target.value.toUpperCase() })}
+                    onChange={(e) => handleKodeProdukChange(e.target.value)}
                     className={inputBase}
                     placeholder="Contoh: PBSJ1"
                     disabled={isEditing}
@@ -445,54 +491,57 @@ export default function AdminBatchOverfilledPage() {
                           </td>
                         </tr>
                       ) : (
-                        formData.materials.map((m, i) => (
-                          <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
-                            <td className="px-2 py-2 text-xs text-center">{i + 1}</td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="text"
-                                value={m.kode_material}
-                                onChange={(e) => updateMaterial(i, 'kode_material', e.target.value)}
-                                className={cn(inputBase, 'w-full')}
-                                placeholder="MAT-001"
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="text"
-                                value={m.label}
-                                onChange={(e) => updateMaterial(i, 'label', e.target.value)}
-                                className={cn(inputBase, 'w-full')}
-                                placeholder="sodbic"
-                              />
-                            </td>
-                            <td className="px-2 py-2">
-                              <input
-                                type="number"
-                                step="any"
-                                value={m.target_kg}
-                                onChange={(e) => updateMaterial(i, 'target_kg', parseFloat(e.target.value) || 0)}
-                                className={cn(inputBase, 'w-full text-right')}
-                              />
-                            </td>
-                            <td className="px-2 py-2 text-center">
-                              <button
-                                onClick={() => removeMaterial(i)}
-                                className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                // disabled={formData.materials.length <= 1}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        formData.materials.map((m, i) => {
+                          const defaultData = getDefaultMaterialName(i, formData.kode_produk)
+                          return (
+                            <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
+                              <td className="px-2 py-2 text-xs text-center">{i + 1}</td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="text"
+                                  value={m.kode_material}
+                                  onChange={(e) => updateMaterial(i, 'kode_material', e.target.value)}
+                                  className={cn(inputBase, 'w-full')}
+                                  placeholder={defaultData.kode_material || 'Kosong'}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="text"
+                                  value={m.label}
+                                  onChange={(e) => updateMaterial(i, 'label', e.target.value)}
+                                  className={cn(inputBase, 'w-full')}
+                                  placeholder={defaultData.label || 'Kosong'}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={m.target_kg}
+                                  onChange={(e) => updateMaterial(i, 'target_kg', parseFloat(e.target.value) || 0)}
+                                  className={cn(inputBase, 'w-full text-right')}
+                                  placeholder="0"
+                                />
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                <button
+                                  onClick={() => removeMaterial(i)}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Thresholds - Bisa tambah/hapus manual */}
+              {/* Thresholds */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
@@ -593,13 +642,6 @@ export default function AdminBatchOverfilledPage() {
                     🔄 Reset Auto
                   </button>
                 </div>
-              </div>
-
-              {/* Info */}
-              <div className={cn('p-3 rounded-lg text-xs', isDark ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-50 text-gray-500')}>
-                <p>📊 {formData.materials.length} material, {formData.thresholds.length} threshold</p>
-                <p className="mt-1">💡 Threshold: criteria_index = pivot material, target_index = material yang dicek</p>
-                <p className="mt-1">📌 Material terakhir otomatis dihitung dari Bobot Total</p>
               </div>
 
               {error && (

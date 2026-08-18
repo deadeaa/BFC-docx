@@ -54,9 +54,12 @@ interface BKReport {
 
 // ── Helpers ──────────────────────────────────────────────────
 
+// Format angka dengan 3 desimal, hilangkan trailing zeros
 function fmt(v: number | null | undefined, decimals = 3): string {
   if (v == null || isNaN(v)) return '-'
-  return v.toFixed(decimals)
+  const formatted = v.toFixed(decimals)
+  // Hilangkan trailing zeros tapi tetap pertahankan angka desimal yang有意义
+  return formatted.replace(/\.?0+$/, '')
 }
 
 function today(): string {
@@ -74,7 +77,7 @@ export default function BatchKhususPage() {
   const isDark = theme === 'dark'
   const { user } = useAuth()
 
-  // ✅ Cek apakah user admin
+  // Cek apakah user admin
   const isAdmin = user?.role === 'admin'
 
   const [productList, setProductList] = useState<ProductOption[]>([])
@@ -85,7 +88,6 @@ export default function BatchKhususPage() {
 
   const [inputRaw, setInputRaw] = useState<string>('')
   const [noBatch, setNoBatch] = useState<string>('')
-  // ✅ Tanggal otomatis hari ini, tidak perlu input manual
   const [tglPembuatan] = useState(today())
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -129,8 +131,6 @@ export default function BatchKhususPage() {
           setLatestReport(reportRes.data)
           setInputRaw(reportRes.data.input_sisa_minor?.toString() || '')
           setNoBatch(reportRes.data.no_batch || '')
-          // ✅ Tanggal tetap pakai hari ini, tapi bisa update dari report
-          // setTglPembuatan(reportRes.data.tgl_pembuatan || today()) // tidak perlu karena tgl sudah state
         }
       } catch {
         // Tidak ada laporan sebelumnya
@@ -212,7 +212,7 @@ export default function BatchKhususPage() {
       const res = await api.post<BKReport>('/batch-khusus/reports', {
         kode_produk: product.kode_produk,
         no_batch: noBatch.trim(),
-        tgl_pembuatan: tglPembuatan, // ✅ pakai tanggal otomatis
+        tgl_pembuatan: tglPembuatan,
         bobot_total: parseFloat(total.toFixed(4)),
         input_sisa_minor: d5,
       })
@@ -236,8 +236,7 @@ export default function BatchKhususPage() {
     const matHeaders = product.materials
       .map(m => `<th>${m.kode_material}</th>`).join('')
 
-    // ✅ ADMIN: tampilkan Qty/sachet
-    // ✅ USER: tidak ada Qty/sachet
+    // Qty/sachet - ADMIN SAJA
     let rowQty = ''
     if (isAdmin) {
       rowQty = `
@@ -248,7 +247,7 @@ export default function BatchKhususPage() {
       </tr>`
     }
 
-    // ✅ Teoritis Batching - SEMUA USER
+    // Teoritis Batching - SEMUA USER
     const rowTeoritis = `
       <tr>
         <td colspan="2" class="label">Teoritis Batching</td>
@@ -256,6 +255,7 @@ export default function BatchKhususPage() {
         <td class="num bold">${fmt(teoritisTotal)}</td>
       </tr>`
 
+    // Input Sisa Minor
     const rowSisa = `
       <tr>
         <td colspan="2" class="label green-label">Input Sisa Minor</td>
@@ -266,20 +266,22 @@ export default function BatchKhususPage() {
         <td class="num bold">${fmt(total)}</td>
       </tr>`
 
+    // Range
     const rowMin = `
       <tr>
         <td rowspan="2" class="label">Range Batching</td>
         <td class="sub">Min</td>
-        ${product.materials.map((m, i) => `<td class="num">${fmt(m.range_min)}</td>`).join('')}
+        ${product.materials.map(m => `<td class="num">${fmt(m.range_min)}</td>`).join('')}
         <td class="num gray">—</td>
       </tr>`
     const rowMax = `
       <tr>
         <td class="sub">Max</td>
-        ${product.materials.map((m, i) => `<td class="num">${fmt(m.range_max)}</td>`).join('')}
+        ${product.materials.map(m => `<td class="num">${fmt(m.range_max)}</td>`).join('')}
         <td class="num gray">—</td>
       </tr>`
 
+    // Rendemen
     const rowsRendemen = product.rendemen.map((r, ri) => `
       <tr>
         ${ri === 0 ? `<td rowspan="${product.rendemen.length}" class="label">Rendemen</td>` : ''}
@@ -376,12 +378,12 @@ export default function BatchKhususPage() {
   )
 
   const calcCell = cn(
-    'px-3 py-2 rounded text-sm text-right',
+    'px-3 py-2 rounded text-sm text-right font-mono',
     isDark ? 'bg-gray-700/60 text-gray-300' : 'bg-gray-50 text-gray-700'
   )
 
   const grayCell = cn(
-    'px-3 py-2 rounded text-sm text-right',
+    'px-3 py-2 rounded text-sm text-right font-mono',
     isDark ? 'bg-gray-700/30 text-gray-500' : 'bg-gray-100 text-gray-400'
   )
 
@@ -500,7 +502,7 @@ export default function BatchKhususPage() {
                 </thead>
                 <tbody>
 
-                  {/* ✅ Qty/sachet - ADMIN SAJA */}
+                  {/* Qty/sachet - ADMIN SAJA */}
                   {isAdmin && (
                     <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                       <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
@@ -517,7 +519,7 @@ export default function BatchKhususPage() {
                     </tr>
                   )}
 
-                  {/* ✅ Teoritis Batching - SEMUA USER */}
+                  {/* Teoritis Batching - SEMUA USER */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
                       Teoritis Batching
@@ -550,14 +552,14 @@ export default function BatchKhususPage() {
                           />
                         ) : (
                           <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
-                            {d5 > 0 ? fmt(materialValues[i]) : '0.000'}
+                            {d5 > 0 ? fmt(materialValues[i]) : '0'}
                           </div>
                         )}
                       </td>
                     ))}
                     <td className="px-3 py-2">
                       <div className={cn(calcCell, 'font-semibold', d5 > 0 ? '' : 'opacity-40')}>
-                        {d5 > 0 ? fmt(total) : '0.000'}
+                        {d5 > 0 ? fmt(total) : '0'}
                       </div>
                     </td>
                   </tr>
@@ -568,11 +570,9 @@ export default function BatchKhususPage() {
                       Range Batching
                     </td>
                     <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>Min</td>
-                    {product.materials.map((m, i) => (
+                    {product.materials.map(m => (
                       <td key={m.material_index} className="px-3 py-2">
-                        <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
-                          {d5 > 0 ? fmt(m.range_min) : fmt(m.range_min)}
-                        </div>
+                        <div className={calcCell}>{fmt(m.range_min)}</div>
                       </td>
                     ))}
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
@@ -581,11 +581,9 @@ export default function BatchKhususPage() {
                   {/* Range Max */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>Max</td>
-                    {product.materials.map((m, i) => (
+                    {product.materials.map(m => (
                       <td key={m.material_index} className="px-3 py-2">
-                        <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
-                          {d5 > 0 ? fmt(m.range_max) : fmt(m.range_max)}
-                        </div>
+                        <div className={calcCell}>{fmt(m.range_max)}</div>
                       </td>
                     ))}
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
@@ -612,7 +610,7 @@ export default function BatchKhususPage() {
                       ))}
                       <td className="px-3 py-2">
                         <div className={cn(calcCell, d5 > 0 ? 'font-medium' : 'opacity-40')}>
-                          {d5 > 0 ? fmt(r.persen * total) : '0.000'}
+                          {d5 > 0 ? fmt(r.persen * total) : '0'}
                         </div>
                       </td>
                     </tr>
@@ -621,18 +619,6 @@ export default function BatchKhususPage() {
                 </tbody>
               </table>
             </div>
-
-            {/* Legenda
-            <div className="flex items-center gap-4 mt-3">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-green-500" />
-                <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Input manual</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className={cn('w-3 h-3 rounded-sm', isDark ? 'bg-gray-700' : 'bg-gray-100')} />
-                <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Dihitung otomatis</span>
-              </div>
-            </div> */}
           </div>
 
           {/* Form Simpan & Export */}
@@ -654,7 +640,6 @@ export default function BatchKhususPage() {
                   className={inputBase}
                 />
               </div>
-              {/* ✅ Tanggal - readonly, otomatis hari ini */}
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
                   Tanggal Pembuatan <span className="text-red-500">*</span>
@@ -748,7 +733,6 @@ export default function BatchKhususPage() {
           onSelectReport={(report: BKReport) => {
             setInputRaw(report.input_sisa_minor?.toString() || '')
             setNoBatch(report.no_batch || '')
-            // ✅ Tanggal tetap pakai hari ini
             setLatestReport(report)
             setShowHistory(false)
           }}

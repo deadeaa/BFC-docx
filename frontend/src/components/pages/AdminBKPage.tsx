@@ -52,6 +52,26 @@ const emptyProduct = (): AdminBKProduct => ({
   rendemen: [],
 })
 
+// ── Helper untuk generate default material name ──────────────
+
+function getDefaultMaterialName(index: number, kodeProduk: string): string {
+  switch (index) {
+    case 0:
+      return '2AS006000J'
+    case 1:
+      if (kodeProduk && kodeProduk.length > 0) {
+        return 'X' + kodeProduk.slice(1)
+      }
+      return ''
+    case 2:
+      return '2AC006000J'
+    case 3:
+      return '2AS012000J'
+    default:
+      return ''
+  }
+}
+
 export default function AdminBatchKhususPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -85,7 +105,7 @@ export default function AdminBatchKhususPage() {
         range_max: m.range_max.toString(),
       })),
       rendemen: formData.rendemen.map(r => ({
-        persen: (r.persen * 100).toFixed(4).toString(),
+        persen: (r.persen * 100).toFixed(2).toString(),
       })),
     })
   }, [formData.materials, formData.rendemen])
@@ -139,57 +159,18 @@ export default function AdminBatchKhususPage() {
     return rendemen
   }
 
-  const handleSave = async () => {
-    if (!formData.kode_produk.trim() || !formData.nama_produk.trim()) {
-      setError('Kode produk dan nama produk wajib diisi')
-      return
-    }
-
-    if (formData.materials.length === 0) {
-      setError('Minimal 1 material harus ditambahkan')
-      return
-    }
-
-    setSaving(true)
-    setError('')
-    try {
-      if (isEditing && formData.id) {
-        await api.put(`/admin/bk/products/${formData.id}`, formData)
-        setSuccess('Produk berhasil diperbarui')
-      } else {
-        await api.post('/admin/bk/products', formData)
-        setSuccess('Produk berhasil ditambahkan')
-      }
-      setIsModalOpen(false)
-      fetchProducts()
-      setTimeout(() => setSuccess(''), 3000)
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Gagal menyimpan produk')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    try {
-      await api.delete(`/admin/bk/products/${deleteTarget}`)
-      setDeleteTarget(null)
-      fetchProducts()
-      setSuccess('Produk berhasil dihapus')
-      setTimeout(() => setSuccess(''), 3000)
-    } catch {
-      setError('Gagal menghapus produk')
-    }
-  }
-
   // ── Material Handlers ──────────────────────────────────────
 
   const addMaterial = () => {
     const lastIndex = formData.materials.length
-    const newMaterials = [...formData.materials, { ...emptyMaterial(), material_index: lastIndex }]
+    const defaultName = getDefaultMaterialName(lastIndex, formData.kode_produk)
     
-    // Auto-generate ulang rendemen
+    const newMaterials = [...formData.materials, { 
+      ...emptyMaterial(), 
+      material_index: lastIndex,
+      kode_material: defaultName,
+    }]
+    
     const newRendemen = generateRendemen(newMaterials.length)
     
     setFormData({
@@ -199,12 +180,33 @@ export default function AdminBatchKhususPage() {
     })
   }
 
+  const handleKodeProdukChange = (newKode: string) => {
+    const upperKode = newKode.toUpperCase()
+    setFormData({ ...formData, kode_produk: upperKode })
+    
+    // Update material index 1 jika ada
+    const materialIndex1 = formData.materials.findIndex(m => m.material_index === 1)
+    if (materialIndex1 !== -1) {
+      const currentMaterial = formData.materials[materialIndex1]
+      const defaultName = getDefaultMaterialName(1, upperKode)
+      
+      if (!currentMaterial.kode_material || 
+          currentMaterial.kode_material.startsWith('X') ||
+          currentMaterial.kode_material === getDefaultMaterialName(1, formData.kode_produk)) {
+        const newMaterials = [...formData.materials]
+        newMaterials[materialIndex1] = { 
+          ...newMaterials[materialIndex1], 
+          kode_material: defaultName 
+        }
+        setFormData(prev => ({ ...prev, materials: newMaterials }))
+      }
+    }
+  }
+
   const removeMaterial = (index: number) => {
-    // if (formData.materials.length <= 1) return
     const newMaterials = formData.materials.filter((_, i) => i !== index)
     newMaterials.forEach((m, i) => m.material_index = i)
     
-    // Auto-generate ulang rendemen
     const newRendemen = generateRendemen(newMaterials.length)
     
     setFormData({
@@ -277,7 +279,6 @@ export default function AdminBatchKhususPage() {
   }
 
   const removeRendemen = (index: number) => {
-    // ✅ Bisa dihapus sampai kosong
     const newRendemen = formData.rendemen.filter((_, i) => i !== index)
     newRendemen.forEach((r, i) => r.sort_order = i)
     setFormData({ ...formData, rendemen: newRendemen })
@@ -318,6 +319,50 @@ export default function AdminBatchKhususPage() {
       const newDisplay = { ...displayValues }
       newDisplay.rendemen[index] = { persen: '0' }
       setDisplayValues(newDisplay)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!formData.kode_produk.trim() || !formData.nama_produk.trim()) {
+      setError('Kode produk dan nama produk wajib diisi')
+      return
+    }
+
+    if (formData.materials.length === 0) {
+      setError('Minimal 1 material harus ditambahkan')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    try {
+      if (isEditing && formData.id) {
+        await api.put(`/admin/bk/products/${formData.id}`, formData)
+        setSuccess('Produk berhasil diperbarui')
+      } else {
+        await api.post('/admin/bk/products', formData)
+        setSuccess('Produk berhasil ditambahkan')
+      }
+      setIsModalOpen(false)
+      fetchProducts()
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Gagal menyimpan produk')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await api.delete(`/admin/bk/products/${deleteTarget}`)
+      setDeleteTarget(null)
+      fetchProducts()
+      setSuccess('Produk berhasil dihapus')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch {
+      setError('Gagal menghapus produk')
     }
   }
 
@@ -455,9 +500,9 @@ export default function AdminBatchKhususPage() {
                   <input
                     type="text"
                     value={formData.kode_produk}
-                    onChange={(e) => setFormData({ ...formData, kode_produk: e.target.value.toUpperCase() })}
+                    onChange={(e) => handleKodeProdukChange(e.target.value)}
                     className={inputBase}
-                    placeholder="Contoh: BK-001"
+                    placeholder="Contoh: PEBJ3"
                     disabled={isEditing}
                   />
                   {isEditing && (
@@ -524,7 +569,7 @@ export default function AdminBatchKhususPage() {
                                 value={m.kode_material}
                                 onChange={(e) => updateMaterialText(i, 'kode_material', e.target.value)}
                                 className={cn(inputBase, 'w-full')}
-                                placeholder="MAT-001"
+                                placeholder={i < 4 ? getDefaultMaterialName(i, formData.kode_produk) : 'Kosong'}
                               />
                             </td>
                             <td className="px-2 py-2">
@@ -575,7 +620,6 @@ export default function AdminBatchKhususPage() {
                               <button
                                 onClick={() => removeMaterial(i)}
                                 className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                // disabled={formData.materials.length <= 1}
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -588,13 +632,13 @@ export default function AdminBatchKhususPage() {
                 </div>
               </div>
 
-              {/* Rendemen - Compact */}
+              {/* Rendemen */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
                     Rendemen
                     <span className="text-xs font-normal text-gray-400 ml-2">
-                      ({formData.rendemen.length}) - auto
+                      ({formData.rendemen.length})
                     </span>
                   </label>
                   <button
@@ -650,17 +694,6 @@ export default function AdminBatchKhususPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className={cn('text-xs mt-2', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                  💡 Auto generate {formData.materials.length} rendemen saat material berubah
-                </p>
-              </div>
-
-              {/* Info */}
-              <div className={cn('p-3 rounded-lg text-xs', isDark ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-50 text-gray-500')}>
-                <p>📊 {formData.materials.length} material, {formData.rendemen.length} rendemen</p>
-                <p className="mt-1">💡 Qty/sachet: digunakan untuk perhitungan</p>
-                <p className="mt-1">📌 Teoritis: hanya untuk tampilan</p>
-                <p className="mt-1">🔄 Rendemen auto update saat material berubah</p>
               </div>
 
               {error && (
