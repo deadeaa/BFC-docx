@@ -179,8 +179,8 @@ export default function DownloadReportPage() {
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
-      let filename = `report_${selectedKode}`
-      if (selectedBK) filename += `_BK_${selectedBK.no_batch}`
+      let filename = `LP Batch Khusus ${selectedKode}`
+      if (selectedBK) filename += ` ${selectedBK.no_batch}`
       filename += '.docx'
       link.download = filename
       document.body.appendChild(link)

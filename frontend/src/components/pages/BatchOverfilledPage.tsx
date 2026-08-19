@@ -1,3 +1,4 @@
+// frontend/src/components/pages/BatchOverfilledPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
 import api from '../../lib/api'
@@ -87,7 +88,6 @@ interface BOReport {
 
 const EPS = 1e-9
 
-// ✅ Format angka - hilangkan angka 0 di belakang
 function fmt(v: number | null | undefined): string {
   if (v == null || isNaN(v)) return '-'
   return parseFloat(v.toFixed(5)).toString()
@@ -119,7 +119,7 @@ function findPivotIndex(ratioValues: number[]): number {
   return maxIdx
 }
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Calculate Criteria - SELALU RETURN DATA ────────────────
 
 function calculateCriteria(
   materials: BOMaterial[],
@@ -127,89 +127,23 @@ function calculateCriteria(
   thresholds: BOThreshold[],
   allFilled: boolean
 ): CriteriaResult[] {
-  if (!allFilled || ratio.some(r => r == null)) {
-    return materials.map((m, i) => ({
-      materialIndex: i,
-      label: m.label,
-      status: 'TMS' as const,
-      pivotValue: 0,
-      checks: []
-    }))
-  }
-
-  const ratioVals = ratio as number[]
-  const pivotIdx = findPivotIndex(ratioVals)
-  const pivotValue = ratioVals[pivotIdx]
-
+  // ✅ Selalu return data untuk semua material
   return materials.map((m, i) => {
-    const isPivot = i === pivotIdx
-    
-    if (!isPivot) {
-      // ❌ Non-pivot otomatis TMS
-      return {
-        materialIndex: i,
-        label: m.label,
-        status: 'TMS' as const,
-        pivotValue: 0,
-        checks: []
-      }
-    }
-    
-    // ✅ PIVOT: cek semua threshold
-    const checks: { targetIndex: number, minRatio: number, maxRatio: number, actualRatio: number, passed: boolean }[] = []
-    let allPassed = true
-    
-    // Cek semua material target untuk pivot ini
-    materials.forEach((targetMat, j) => {
-      if (i === j) {
-        // Pivot terhadap dirinya sendiri: harus 1
-        const passed = Math.abs(ratioVals[i] - 1) < EPS
-        if (!passed) allPassed = false
-        
-        checks.push({
-          targetIndex: i,
-          minRatio: 1,
-          maxRatio: 1,
-          actualRatio: ratioVals[i],
-          passed
-        })
-      } else {
-        // Cari threshold untuk pivot (i) terhadap target (j)
-        const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
-        
-        if (th) {
-          const passed = ratioVals[j] >= th.min_ratio - EPS && ratioVals[j] <= th.max_ratio + EPS
-          if (!passed) allPassed = false
-          
-          checks.push({
-            targetIndex: j,
-            minRatio: th.min_ratio,
-            maxRatio: th.max_ratio,
-            actualRatio: ratioVals[j],
-            passed
-          })
-        } else {
-          // Tidak ada threshold, dianggap passed
-          checks.push({
-            targetIndex: j,
-            minRatio: 0,
-            maxRatio: 0,
-            actualRatio: ratioVals[j],
-            passed: true
-          })
-        }
-      }
-    })
-    
-    // ✅ Status pivot: MS jika semua syarat terpenuhi
-    const status = allPassed ? 'MS' : 'TMS'
+    // Cari threshold untuk material ini
+    const materialThresholds = thresholds.filter(t => t.criteria_index === i)
     
     return {
       materialIndex: i,
       label: m.label,
-      status,
-      pivotValue: isPivot ? pivotValue : 0,
-      checks
+      status: allFilled ? 'TMS' as const : 'TMS' as const,
+      pivotValue: 0,
+      checks: materialThresholds.map(th => ({
+        targetIndex: th.target_index,
+        minRatio: th.min_ratio,
+        maxRatio: th.max_ratio,
+        actualRatio: 0,
+        passed: false
+      }))
     }
   })
 }
@@ -298,9 +232,9 @@ export default function BatchOverfilledPage() {
     ? findPivotIndex(ratio as number[]) 
     : -1
   
-  // ✅ Kesimpulan: MS jika semua material MS, TMS jika ada yang TMS
-const pivotResult = criteriaResults.find(c => c.pivotValue > 0) // cari pivot
-const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
+  const pivotResult = criteriaResults.find(c => c.pivotValue > 0)
+  const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
+  
   const targetBaru = materials.map(m => (nilaiTertinggi != null ? m.target_kg * nilaiTertinggi : null))
   const tambahanReproses = targetBaru.map((f, i) => (f != null && hasilBatching[i] != null ? f - (hasilBatching[i] as number) : null))
 
@@ -345,7 +279,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
     }
   }, [selectedKode, filterNoBatch])
 
-  // ── ✅ AUTO-REFRESH HISTORY WHEN FILTER CHANGES ──────────────
   useEffect(() => {
     if (selectedKode && showHistory) {
       console.log('🔄 Auto-refresh history due to filter change:', filterNoBatch || 'all')
@@ -397,7 +330,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
             setInputRaws(lastInputs)
             setBobotTotalRaw(reportRes.data.bobot_total?.toString() || '')
             setNoBatch(reportRes.data.no_batch || '')
-            // setTglPembuatan(reportRes.data.tgl_pembuatan || today())
           }
         }
       } catch (err) {
@@ -499,22 +431,18 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
 
     const matHeaders = materials.map(m => `<th>${materialHeader(m)}</th>`).join('')
 
-    // ✅ Format angka - hilangkan trailing zeros
     const getValue = (val: number | null | undefined): string => {
       if (val == null || isNaN(val)) return '-'
       return parseFloat(val.toFixed(5)).toString()
     }
 
-    // ✅ Row "ISI DI BARIS INI" - komponen terakhir harus terisi (hasil otomatis)
     const rowIsiDiBarisIni = `
       <tr>
         <td colspan="2" class="label green-label">Hasil Batching </td>
         ${materials.map((_, i) => {
           if (i < directCount) {
-            // Input manual
             return `<td class="num green-cell">${getValue(parseFloat(inputRaws[i]))}</td>`
           } else {
-            // Komponen terakhir - hasil otomatis (bobot total - sum)
             return `<td class="num green-cell">${getValue(hasilBatching[i])}</td>`
           }
         }).join('')}
@@ -542,7 +470,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
         ${perbandingan.map(v => `<td class="num">${getValue(v)}</td>`).join('')}
       </tr>`
 
-    // ✅ Nilai Tertinggi - center
     const rowNilaiTertinggi = `
       <tr>
         <td colspan="2" class="label">D &ndash; Pilih Nilai (C) Tertinggi(i)</td>
@@ -555,9 +482,8 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
         ${ratio.map(v => `<td class="num">${getValue(v)}</td>`).join('')}
       </tr>`
 
-    // ✅ SYARAT - tanpa bintang
+    // Syarat - selalu tampil
     const syaratRows = materials.map((rowMat, i) => {
-      const cr = criteriaResults[i]
       const isPivot = i === pivotIndex
       
       const checkCells = materials.map((_, j) => {
@@ -573,17 +499,14 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
         return `<td class="num text-gray-400">-</td>`
       }).join('')
       
-      const statusColor = cr.status === 'MS' ? 'text-green-500' : 'text-red-500'
-      
       return `
         <tr>
-          <td colspan="2" class="label">Overfilled ${rowMat.label}${isPivot ? '' : ''} <span class="${statusColor}">(${cr.status})</span></td>
+          <td colspan="2" class="label">Overfilled ${rowMat.label}${isPivot ? ' ⭐' : ''} <span class="text-gray-400">(TMS)</span></td>
           ${checkCells}
         </tr>
       `
     }).join('')
 
-    // ✅ Kesimpulan - full width
     const rowKesimpulan = `
       <tr>
         <td colspan="2" class="label bold">Kesimpulan</td>
@@ -710,13 +633,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
   const codeBadge = cn(
     'inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold mr-2 flex-shrink-0',
     isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'
-  )
-
-  const badge = (status: 'MS' | 'TMS') => cn(
-    'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold',
-    status === 'MS'
-      ? (isDark ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-700')
-      : (isDark ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700')
   )
 
   return (
@@ -930,7 +846,7 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                     ))}
                   </tr>
 
-                  {/* ✅ SYARAT - Range min-max */}
+                  {/* ✅ SYARAT - Selalu muncul (tidak perlu allFilled) */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td colSpan={materials.length + 1} className="px-3 pt-4 pb-1">
                       <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9CA3AF' : '#6B7280' }}>
@@ -944,17 +860,16 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                     </td>
                   </tr>
 
-                  {/* ✅ Tabel Syarat - Range dengan MS/TMS yang benar */}
-                  {allFilled && materials.map((rowMat, i) => {
-                    const cr = criteriaResults[i]
+                  {/* ✅ Tabel Syarat - Selalu tampil dengan threshold dari database */}
+                  {materials.map((rowMat, i) => {
                     const isPivot = i === pivotIndex
                     
                     return (
                       <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                         <td className={cn('px-3 py-2.5 text-sm whitespace-nowrap min-w-[180px]', isDark ? 'text-gray-300' : 'text-gray-600')}>
                           <span>Overfilled {rowMat.label}{isPivot ? ' ⭐' : ''}</span>
-                          <span className={cn('ml-2 text-xs font-bold', cr.status === 'MS' ? 'text-green-500' : 'text-red-500')}>
-                            ({cr.status})
+                          <span className={cn('ml-2 text-xs font-bold', 'text-gray-400')}>
+                            (TMS)
                           </span>
                         </td>
                         {materials.map((_, j) => {
@@ -1034,17 +949,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                 </tbody>
               </table>
             </div>
-
-            {/* <div className="flex items-center gap-4 mt-3">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-green-500" />
-                <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Input manual</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className={cn('w-3 h-3 rounded-sm', isDark ? 'bg-gray-700' : 'bg-gray-100')} />
-                <span className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>Dihitung otomatis</span>
-              </div>
-            </div> */}
           </div>
 
           {/* Form Simpan & Export */}
@@ -1164,7 +1068,6 @@ const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
                 setInputRaws(inputs)
                 setBobotTotalRaw(report.bobot_total?.toString() || '')
                 setNoBatch(report.no_batch || '')
-                // setTglPembuatan(report.tgl_pembuatan || today())
                 setLatestReport(report)
                 setShowHistory(false)
               } catch (e) {
