@@ -1,5 +1,4 @@
-// docx-service/index.js - replace dengan yang ini
-
+// backend/index.js
 const express = require('express');
 const cors = require('cors');
 const Docxtemplater = require('docxtemplater');
@@ -25,12 +24,11 @@ function log(message, data = null) {
 // ✅ Fungsi untuk mencari file di multiple path
 function findTemplateFile(templatePath) {
   const possiblePaths = [
-    templatePath, // original
-    path.join(process.cwd(), templatePath), // relative to docx-service
-    path.join(process.cwd(), '..', templatePath), // one level up
-    path.join(process.cwd(), '../..', templatePath), // two levels up (ke backend/)
-    path.join(process.cwd(), '../../..', templatePath), // three levels up
-    // Path dengan nama file saja
+    templatePath,
+    path.join(process.cwd(), templatePath),
+    path.join(process.cwd(), '..', templatePath),
+    path.join(process.cwd(), '../..', templatePath),
+    path.join(process.cwd(), '../../..', templatePath),
     path.basename(templatePath),
     path.join(process.cwd(), 'uploads', 'templates', path.basename(templatePath)),
     path.join(process.cwd(), '..', 'uploads', 'templates', path.basename(templatePath)),
@@ -63,7 +61,6 @@ app.post('/generate-docx', async (req, res) => {
       return res.status(400).json({ message: 'Template path tidak ditemukan' });
     }
 
-    // ✅ Cari file
     const fullPath = findTemplateFile(templatePath);
 
     if (!fullPath) {
@@ -74,7 +71,6 @@ app.post('/generate-docx', async (req, res) => {
       });
     }
 
-    // Baca template
     const content = fs.readFileSync(fullPath, 'binary');
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip, {
@@ -84,11 +80,8 @@ app.post('/generate-docx', async (req, res) => {
     });
 
     log('📝 Rendering template...');
-
-    // Render dengan data
     doc.render(data);
 
-    // Generate output
     const buffer = doc.getZip().generate({
       type: 'nodebuffer',
       compression: 'DEFLATE',
@@ -128,7 +121,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-const PORT = process.env.PORT || 3001;
+// ✅ PASTIKAN INI PAKAI PORT_NODE!
+const PORT = process.env.PORT_NODE || 3001;
 app.listen(PORT, () => {
   console.log(`📄 DOCX Service running on port ${PORT}`);
   console.log(`📁 Current working directory: ${process.cwd()}`);
