@@ -7,6 +7,8 @@ const PizZip = require('pizzip');
 const fs = require('fs');
 const path = require('path');
 
+require('dotenv').config({ path: '../.env' });
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));

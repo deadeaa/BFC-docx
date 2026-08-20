@@ -1,4 +1,3 @@
-// backend/main.go
 package main
 
 import (
@@ -120,7 +119,7 @@ func main() {
 			adminGroup.POST("/users", userHandler.Create)
 			adminGroup.PUT("/users/:id", userHandler.Update)
 			adminGroup.DELETE("/users/:id", userHandler.Delete)
-			
+
 			// Activity logs
 			adminGroup.GET("/logs", logHandler.List)
 			adminGroup.GET("/logs/:id", logHandler.Detail)

@@ -84,7 +84,7 @@ func formatFloat3(val interface{}) float64 {
 	}
 }
 
-// generateDocxViaNode memanggil service Node.js untuk generate DOCX
+// ✅ generateDocxViaNode - baca URL dari .env
 func (h *ReportDownloadHandler) generateDocxViaNode(templatePath string, data map[string]interface{}) ([]byte, error) {
 	fmt.Printf("📄 Generating DOCX from template: %s\n", templatePath)
 	fmt.Printf("📊 Data keys: %v\n", getKeys(data))
@@ -99,7 +99,16 @@ func (h *ReportDownloadHandler) generateDocxViaNode(templatePath string, data ma
 		return nil, fmt.Errorf("marshal payload: %w", err)
 	}
 
-	resp, err := http.Post("http://localhost:3001/generate-docx", "application/json", bytes.NewBuffer(jsonPayload))
+	// ✅ Baca URL dari environment variable
+	docxServiceURL := os.Getenv("DOCX_SERVICE_URL")
+	if docxServiceURL == "" {
+		docxServiceURL = "http://localhost:3001"
+	}
+	url := docxServiceURL + "/generate-docx"
+
+	fmt.Printf("🔗 Calling DOCX service: %s\n", url)
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, fmt.Errorf("gagal terhubung ke docx-service: %w", err)
 	}
@@ -256,8 +265,8 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 			hasil = 0
 		}
 
-		// ✅ FIX: Range Min = Material Value - range_min
-		// ✅ FIX: Range Max = Material Value - range_max
+		// ✅ Range Min = Material Value - range_min
+		// ✅ Range Max = Material Value - range_max
 		var rangeMin, rangeMax float64
 		if idx < len(materialValues) {
 			rangeMin = formatFloat2(materialValues[idx] - m.RangeMin)
@@ -347,7 +356,7 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 }
 
 // ============================================================
-// PREPARE BO DATA (untuk nanti kalau dipakai)
+// PREPARE BO DATA
 // ============================================================
 func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string, report *models.BOReport) (map[string]interface{}, error) {
 	fmt.Printf("📦 Preparing BO data for product: %s\n", kodeProduk)
@@ -681,7 +690,7 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 }
 
 // ============================================================
-// DOWNLOAD GABUNGAN BO + BK (tetap ada untuk nanti)
+// DOWNLOAD GABUNGAN BO + BK
 // ============================================================
 
 type CombinedReportRequest struct {
@@ -836,7 +845,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 }
 
 // ============================================================
-// DOWNLOAD INDIVIDUAL (BO atau BK) - TETAP ADA
+// DOWNLOAD INDIVIDUAL (BO atau BK)
 // ============================================================
 
 func (h *ReportDownloadHandler) DownloadReport(c *gin.Context) {
