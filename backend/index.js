@@ -21,7 +21,7 @@ function log(message, data = null) {
   }
 }
 
-// ✅ Fungsi untuk mencari file di multiple path
+// Fungsi untuk mencari file di multiple path
 function findTemplateFile(templatePath) {
   const possiblePaths = [
     templatePath,
