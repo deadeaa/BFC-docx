@@ -66,7 +66,7 @@ function getDefaultMaterialName(index: number, kodeProduk: string): { kode_mater
     case 2:
       return { kode_material: '2AC006000J', label: 'Citric' }
     case 3:
-      return { kode_material: '2AS012000J', label: 'Gula' }
+      return { kode_material: '2AS012000', label: 'Gula' }
     default:
       return { kode_material: '', label: '' }
   }
