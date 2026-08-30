@@ -81,6 +81,7 @@ export default function BatchKhususPage() {
 
   const [productList, setProductList] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
+  const [jenisProduk, setJenisProduk] = useState<'ruah' | 'minor' | ''>('')
   const [product, setProduct] = useState<BKProduct | null>(null)
   const [loadingProduct, setLoadingProduct] = useState(false)
   const [loadingLatest, setLoadingLatest] = useState(false)
@@ -103,6 +104,32 @@ export default function BatchKhususPage() {
       .then(res => setProductList(res.data))
       .catch(() => {})
   }, [])
+
+  // ── Filter produk berdasarkan jenis ──────────────────────────
+  const filteredProducts = productList.filter((p) => {
+    const kode = p.kode_produk.toUpperCase()
+    
+    if (jenisProduk === 'ruah') {
+      return kode.startsWith('P') || kode.startsWith('B')
+    } else if (jenisProduk === 'minor') {
+      return kode.startsWith('X')
+    }
+    
+    return true
+  })
+
+  const handleJenisProdukChange = (value: 'ruah' | 'minor' | '') => {
+    setJenisProduk(value)
+    setSelectedKode('')
+    setProduct(null)
+    setLatestReport(null)
+    setInputRaw('')
+    setNoBatch('')
+    setSaveSuccess(false)
+    setSaveError('')
+    setFilterNoBatch('')
+    setHistoryData([])
+  }
 
   const handleSelectKode = useCallback(async (kode: string) => {
     setSelectedKode(kode)
@@ -167,8 +194,6 @@ export default function BatchKhususPage() {
   const teoritisTotal = product?.materials.reduce((s, m) => s + m.teoritis, 0) ?? 0
 
   // ── Hitung Range Batching ──────────────────────────────────
-  // Range Min = Material Value - range_min (per material)
-  // Range Max = Material Value - range_max (per material)
   function computeRangeValues(): { min: number[]; max: number[] } {
     if (!product || d5 <= 0) {
       return { 
@@ -252,7 +277,6 @@ export default function BatchKhususPage() {
     const matHeaders = product.materials
       .map(m => `<th>${m.kode_material}</th>`).join('')
 
-    // Qty/sachet - ADMIN SAJA
     let rowQty = ''
     if (isAdmin) {
       rowQty = `
@@ -263,7 +287,6 @@ export default function BatchKhususPage() {
       </tr>`
     }
 
-    // Teoritis Batching - SEMUA USER
     const rowTeoritis = `
       <tr>
         <td colspan="2" class="label">Teoritis Batching</td>
@@ -271,7 +294,6 @@ export default function BatchKhususPage() {
         <td class="num bold">${fmt(teoritisTotal)}</td>
       </tr>`
 
-    // Input Sisa Minor
     const rowSisa = `
       <tr>
         <td colspan="2" class="label green-label">Input Sisa Minor</td>
@@ -282,7 +304,6 @@ export default function BatchKhususPage() {
         <td class="num bold">${fmt(total)}</td>
       </tr>`
 
-    // Range Min - HASIL PERHITUNGAN: Material Value - range_min
     const rowMin = `
       <tr>
         <td rowspan="2" class="label">Range Batching</td>
@@ -291,7 +312,6 @@ export default function BatchKhususPage() {
         <td class="num gray">—</td>
       </tr>`
 
-    // Range Max - HASIL PERHITUNGAN: Material Value - range_max
     const rowMax = `
       <tr>
         <td class="sub">Max</td>
@@ -299,7 +319,6 @@ export default function BatchKhususPage() {
         <td class="num gray">—</td>
       </tr>`
 
-    // Rendemen
     const rowsRendemen = product.rendemen.map((r, ri) => `
       <tr>
         ${ri === 0 ? `<td rowspan="${product.rendemen.length}" class="label">Rendemen</td>` : ''}
@@ -431,31 +450,61 @@ export default function BatchKhususPage() {
           )}
         </div>
         <p className={cn('text-sm ml-12', isDark ? 'text-gray-400' : 'text-gray-500')}>
-          Pilih kode produk, masukkan Input Sisa Minor dan No. Batch, lalu simpan atau export PDF.
+          Pilih jenis produk, pilih kode produk, masukkan Input Sisa Minor dan No. Batch
+        </p>
+      </div>
+
+      {/* Pilih Jenis Produk */}
+      <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
+        <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
+          Jenis Produk
+        </label>
+        <div className="relative max-w-xs">
+          <select
+            value={jenisProduk}
+            onChange={(e) => handleJenisProdukChange(e.target.value as 'ruah' | 'minor' | '')}
+            className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
+          >
+            <option value="">-- Pilih Jenis Produk --</option>
+            <option value="ruah">Produk Ruah</option>
+            <option value="minor">Produk Minor</option>
+          </select>
+          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+        </div>
+        <p className="text-xs text-gray-400 mt-1">
+          {jenisProduk === 'ruah' && '📦 Produk ruah: PEBJ3, PEBJ4, PBSJ1, dll'}
+          {jenisProduk === 'minor' && '🧪 Produk minor: XEBJ3, XEBJ4, XBSJ1, dll'}
         </p>
       </div>
 
       {/* Pilih Kode Produk */}
-      <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
-        <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
-          Kode Produk
-        </label>
-        <div className="relative max-w-xs">
-          <select
-            value={selectedKode}
-            onChange={e => handleSelectKode(e.target.value)}
-            className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
-          >
-            <option value="">-- Pilih Kode Produk --</option>
-            {productList.map(p => (
-              <option key={p.kode_produk} value={p.kode_produk}>
-                {p.kode_produk} – {p.nama_produk}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+      {jenisProduk && (
+        <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
+          <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
+            Kode Produk
+          </label>
+          <div className="relative max-w-xs">
+            <select
+              value={selectedKode}
+              onChange={e => handleSelectKode(e.target.value)}
+              className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
+            >
+              <option value="">-- Pilih Kode Produk --</option>
+              {filteredProducts.map(p => (
+                <option key={p.kode_produk} value={p.kode_produk}>
+                  {p.kode_produk} – {p.nama_produk}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+          </div>
+          {filteredProducts.length === 0 && (
+            <p className="text-xs text-yellow-500 mt-1">
+              ⚠️ Tidak ada produk {jenisProduk} tersedia
+            </p>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Loading */}
       {loadingProduct && (
@@ -493,7 +542,6 @@ export default function BatchKhususPage() {
       {product && !loadingProduct && (
         <>
           <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
-            {/* Info produk */}
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
                 <span className={cn('text-xs font-medium', isDark ? 'text-gray-400' : 'text-gray-500')}>Kode Produk</span>
@@ -505,7 +553,6 @@ export default function BatchKhususPage() {
               </div>
             </div>
 
-            {/* Tabel */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -519,8 +566,6 @@ export default function BatchKhususPage() {
                   </tr>
                 </thead>
                 <tbody>
-
-                  {/* Qty/sachet - ADMIN SAJA */}
                   {isAdmin && (
                     <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                       <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
@@ -537,7 +582,6 @@ export default function BatchKhususPage() {
                     </tr>
                   )}
 
-                  {/* Teoritis Batching - SEMUA USER */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
                       Teoritis Batching
@@ -552,7 +596,6 @@ export default function BatchKhususPage() {
                     </td>
                   </tr>
 
-                  {/* Input Sisa Minor */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-semibold text-sm', isDark ? 'text-green-400' : 'text-green-700')} colSpan={2}>
                       Input Sisa Minor
@@ -582,7 +625,6 @@ export default function BatchKhususPage() {
                     </td>
                   </tr>
 
-                  {/* Range Min - HASIL PERHITUNGAN: Material Value - range_min */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} rowSpan={2}>
                       Range Batching
@@ -598,7 +640,6 @@ export default function BatchKhususPage() {
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
                   </tr>
 
-                  {/* Range Max - HASIL PERHITUNGAN: Material Value - range_max */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>Max</td>
                     {rangeValues.max.map((v, i) => (
@@ -611,7 +652,6 @@ export default function BatchKhususPage() {
                     <td className="px-3 py-2"><div className={grayCell}>—</div></td>
                   </tr>
 
-                  {/* Rendemen */}
                   {product.rendemen.map((r, ri) => (
                     <tr key={r.id} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                       {ri === 0 && (
@@ -637,7 +677,6 @@ export default function BatchKhususPage() {
                       </td>
                     </tr>
                   ))}
-
                 </tbody>
               </table>
             </div>
