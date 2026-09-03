@@ -5,3 +5,10 @@
 dist/
 app-backend
 node_modules/
+# # Docker
+# *.docker
+# docker-compose.override.yml
+
+# # Uploads (keep folder structure)
+# uploads/
+# !uploads/.gitkeep

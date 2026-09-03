@@ -1,0 +1,56 @@
+# backend/Dockerfile
+FROM golang:1.22-alpine AS go-builder
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build Go binary
+RUN CGO_ENABLED=0 GOOS=linux go build -o bfc-backend main.go
+
+
+# ============================================================
+# Stage 2: Node.js builder
+# ============================================================
+FROM node:18-alpine AS node-builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci --only=production
+
+
+# ============================================================
+# Stage 3: Final image
+# ============================================================
+FROM alpine:latest
+
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates nodejs npm
+
+WORKDIR /root/
+
+# Copy Go binary
+COPY --from=go-builder /app/bfc-backend .
+
+# Copy Node.js app
+COPY --from=node-builder /app/node_modules ./node_modules
+COPY index.js .
+
+# Copy uploads directory
+RUN mkdir -p uploads/templates
+
+# Copy .env (optional, tapi lebih baik pake environment variables)
+# COPY ../.env .env
+
+EXPOSE 8080
+EXPOSE 3001
+
+# Start both services
+CMD ["sh", "-c", "node index.js & ./bfc-backend"]

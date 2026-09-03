@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # POSTGRESQL DATABASE
+  # ============================================================
+  db:
+    image: postgres:15-alpine
+    container_name: bfc_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-bfc_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bfc_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # BACKEND (Go + Node.js di dalam 1 container)
+  # ============================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bfc_backend
+    restart: always
+    environment:
+      PORT: ${PORT:-8080}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-bfc_db}?sslmode=disable
+      DOCX_SERVICE_URL: http://localhost:3001
+      PORT_NODE: ${PORT_NODE:-3001}
+    ports:
+      - "8080:8080"
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/root/uploads
+    networks:
+      - bfc_network
+
+  # ============================================================
+  # FRONTEND (React/Vite)
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bfc_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - bfc_network
+
+volumes:
+  postgres_data:
+
+networks:
+  bfc_network:
+    driver: bridge
