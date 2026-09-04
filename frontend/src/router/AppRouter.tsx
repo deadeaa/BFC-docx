@@ -23,7 +23,9 @@ import AdminBatchOverfilledPage from '../components/pages/AdminBOPage'
 import AdminReportTemplatePage from '../components/pages/AdminUpTemplatePage'
 import DownloadReportPage from '../components/pages/DownloadReportPage'
 
-
+import Error404 from '../components/pages/Error404'
+import Error500 from '../components/pages/Error500'
+import Error503 from '../components/pages/Error503'
 
 export default function AppRouter() {
   return (
@@ -35,6 +37,10 @@ export default function AppRouter() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/" element={<Navigate to="/welcome" replace />} />
+
+              <Route path="/500" element={<Error500 />} />
+              <Route path="/503" element={<Error503 />} />
+              <Route path="*" element={<Error404 />} />
 
             {/* Protected routes */}
             <Route
