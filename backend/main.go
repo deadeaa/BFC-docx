@@ -54,6 +54,8 @@ func main() {
 	// Gin router
 	r := gin.Default()
 
+	r.Use(middleware.ErrorHandler())
+
 	// Serve static files
 	wd, err := os.Getwd()
 	if err != nil {
