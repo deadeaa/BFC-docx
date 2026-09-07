@@ -1,8 +1,9 @@
-// frontend/src/components/pages/LoginPage.tsx
 import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+
+import b7LogoWhite from '../../assets/B7-logo-white.png'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -14,16 +15,13 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Notifikasi saat diarahkan kembali ke halaman ini karena Auto Logout (idle timeout)
   const idleTimeoutState = (location.state as { idleTimeout?: boolean } | null)?.idleTimeout
   const [idleNotice, setIdleNotice] = useState(!!idleTimeoutState)
 
   useEffect(() => {
     if (idleTimeoutState) {
-      // Bersihkan state agar notifikasi tidak muncul lagi saat navigasi/refresh berikutnya
       navigate(location.pathname, { replace: true, state: {} })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSubmit(e: FormEvent) {
@@ -181,9 +179,7 @@ export default function LoginPage() {
       `}</style>
 
       <div className="bfc-login-root">
-        {/* ── LEFT — Hero Section (polos, tanpa card/carousel) ─────────── */}
         <div className="bfc-login-left bfc-hero">
-          {/* Pola dekoratif minimalis */}
           <svg
             aria-hidden
             className="bfc-ring-1"
@@ -204,7 +200,7 @@ export default function LoginPage() {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <img
-              src="/src/assets/B7-logo-white.png"
+              src={b7LogoWhite}
               alt="Bintang Toedjoe"
               className="bfc-logo"
               style={{
@@ -241,7 +237,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ── RIGHT — Form Login (langsung, tanpa card putih) ───────────── */}
         <div className="bfc-login-right">
           <div className="bfc-form bfc-form-card" style={{ width: '100%', maxWidth: '380px' }}>
             <div style={{ marginBottom: '32px' }}>
@@ -275,7 +270,6 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Username */}
               <div>
                 <label style={{
                   display: 'block', marginBottom: '8px',
@@ -299,7 +293,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Password */}
               <div>
                 <label style={{
                   display: 'block', marginBottom: '8px',

@@ -90,7 +90,7 @@ const EPS = 1e-9
 
 function fmt(v: number | null | undefined): string {
   if (v == null || isNaN(v)) return '-'
-  return parseFloat(v.toFixed(5)).toString()
+  return parseFloat(v.toFixed(3)).toString()
 }
 
 function today(): string {
@@ -119,7 +119,7 @@ function findPivotIndex(ratioValues: number[]): number {
   return maxIdx
 }
 
-// ── Calculate Criteria - SELALU RETURN DATA ────────────────
+// ── Calculate Criteria - PERBAIKAN ─────────────────────────
 
 function calculateCriteria(
   materials: BOMaterial[],
@@ -127,23 +127,86 @@ function calculateCriteria(
   thresholds: BOThreshold[],
   allFilled: boolean
 ): CriteriaResult[] {
-  // ✅ Selalu return data untuk semua material
+  // Kalau belum semua input diisi, semua TMS
+  if (!allFilled) {
+    return materials.map((m, i) => ({
+      materialIndex: i,
+      label: m.label,
+      status: 'TMS' as const,
+      pivotValue: 0,
+      checks: []
+    }))
+  }
+
+  // Cari pivot (material dengan ratio tertinggi)
+  const ratioVals = ratio as number[]
+  const pivotIdx = findPivotIndex(ratioVals)
+  const pivotValue = ratioVals[pivotIdx]
+
   return materials.map((m, i) => {
-    // Cari threshold untuk material ini
-    const materialThresholds = thresholds.filter(t => t.criteria_index === i)
-    
+    const isPivot = i === pivotIdx
+    const checks: { targetIndex: number, minRatio: number, maxRatio: number, actualRatio: number, passed: boolean }[] = []
+    let allPassed = true
+
+    if (isPivot) {
+      // PIVOT: cek semua threshold terhadap material lain
+      materials.forEach((targetMat, j) => {
+        if (i === j) {
+          // Pivot terhadap dirinya sendiri: ratio harus 1
+          const passed = Math.abs(ratioVals[i] - 1) < EPS
+          if (!passed) allPassed = false
+          checks.push({
+            targetIndex: i,
+            minRatio: 1,
+            maxRatio: 1,
+            actualRatio: ratioVals[i],
+            passed
+          })
+        } else {
+          // Cari threshold pivot (i) terhadap target (j)
+          const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
+          if (th) {
+            const passed = ratioVals[j] >= th.min_ratio - EPS && ratioVals[j] <= th.max_ratio + EPS
+            if (!passed) allPassed = false
+            checks.push({
+              targetIndex: j,
+              minRatio: th.min_ratio,
+              maxRatio: th.max_ratio,
+              actualRatio: ratioVals[j],
+              passed
+            })
+          } else {
+            // Tidak ada threshold, dianggap passed
+            checks.push({
+              targetIndex: j,
+              minRatio: 0,
+              maxRatio: 0,
+              actualRatio: ratioVals[j],
+              passed: true
+            })
+          }
+        }
+      })
+    } else {
+      // NON-PIVOT: otomatis TMS (tidak dicek)
+      return {
+        materialIndex: i,
+        label: m.label,
+        status: 'TMS' as const,
+        pivotValue: 0,
+        checks: []
+      }
+    }
+
+    // Status pivot: MS jika semua syarat terpenuhi
+    const status = allPassed ? 'MS' : 'TMS'
+
     return {
       materialIndex: i,
       label: m.label,
-      status: allFilled ? 'TMS' as const : 'TMS' as const,
-      pivotValue: 0,
-      checks: materialThresholds.map(th => ({
-        targetIndex: th.target_index,
-        minRatio: th.min_ratio,
-        maxRatio: th.max_ratio,
-        actualRatio: 0,
-        passed: false
-      }))
+      status,
+      pivotValue: isPivot ? pivotValue : 0,
+      checks
     }
   })
 }
@@ -232,7 +295,8 @@ export default function BatchOverfilledPage() {
     ? findPivotIndex(ratio as number[]) 
     : -1
   
-  const pivotResult = criteriaResults.find(c => c.pivotValue > 0)
+  // ✅ FIX: Ambil pivot result dari criteriaResults berdasarkan pivotIndex
+  const pivotResult = pivotIndex >= 0 ? criteriaResults[pivotIndex] : undefined
   const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
   
   const targetBaru = materials.map(m => (nilaiTertinggi != null ? m.target_kg * nilaiTertinggi : null))
@@ -387,14 +451,14 @@ export default function BatchOverfilledPage() {
             kode_material: m.kode_material,
             label: m.label,
             target_kg: m.target_kg,
-            hasil_batching: parseFloat((hasilBatching[i] ?? 0).toFixed(5)),
-            perbandingan: parseFloat((perbandingan[i] ?? 0).toFixed(5)),
-            ratio: parseFloat((ratio[i] ?? 0).toFixed(5)),
-            target_baru: parseFloat((targetBaru[i] ?? 0).toFixed(5)),
-            tambahan_reproses: parseFloat((tambahanReproses[i] ?? 0).toFixed(5)),
+            hasil_batching: parseFloat((hasilBatching[i] ?? 0).toFixed(3)),
+            perbandingan: parseFloat((perbandingan[i] ?? 0).toFixed(3)),
+            ratio: parseFloat((ratio[i] ?? 0).toFixed(3)),
+            target_baru: parseFloat((targetBaru[i] ?? 0).toFixed(2)),
+            tambahan_reproses: parseFloat((tambahanReproses[i] ?? 0).toFixed(2)),
           })),
-          bobot_total: parseFloat(bobotTotal.toFixed(5)),
-          nilai_tertinggi: parseFloat((nilaiTertinggi ?? 0).toFixed(5)),
+          bobot_total: parseFloat(bobotTotal.toFixed(3)),
+          nilai_tertinggi: parseFloat((nilaiTertinggi ?? 0).toFixed(3)),
           kriteria: criteriaResults.map(cr => ({
             materialIndex: cr.materialIndex,
             label: cr.label,
@@ -433,7 +497,7 @@ export default function BatchOverfilledPage() {
 
     const getValue = (val: number | null | undefined): string => {
       if (val == null || isNaN(val)) return '-'
-      return parseFloat(val.toFixed(5)).toString()
+      return parseFloat(val.toFixed(3)).toString()
     }
 
     const rowIsiDiBarisIni = `
@@ -492,16 +556,20 @@ export default function BatchOverfilledPage() {
         }
         const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
         if (th) {
-          const minVal = parseFloat(th.min_ratio.toFixed(5)).toString()
-          const maxVal = parseFloat(th.max_ratio.toFixed(5)).toString()
+          const minVal = parseFloat(th.min_ratio.toFixed(3)).toString()
+          const maxVal = parseFloat(th.max_ratio.toFixed(3)).toString()
           return `<td class="num">${minVal} - ${maxVal}</td>`
         }
         return `<td class="num text-gray-400">-</td>`
       }).join('')
       
+      // ✅ Tampilkan status MS/TMS yang bener
+      const cr = criteriaResults[i]
+      const statusColor = cr?.status === 'MS' ? 'text-green-500' : 'text-red-500'
+      
       return `
         <tr>
-          <td colspan="2" class="label">Overfilled ${rowMat.label}${isPivot ? ' ⭐' : ''} <span class="text-gray-400">(TMS)</span></td>
+          <td colspan="2" class="label">Overfilled ${rowMat.label}${isPivot ? ' ⭐' : ''} <span class="${statusColor}">(${cr?.status || 'TMS'})</span></td>
           ${checkCells}
         </tr>
       `
@@ -759,8 +827,7 @@ export default function BatchOverfilledPage() {
                       </td>
                     ))}
                     <td className="px-3 py-2">
-                      <input
-                        type="text"
+                      <input                        type="text"
                         inputMode="decimal"
                         placeholder="0"
                         value={bobotTotalRaw}
@@ -846,7 +913,7 @@ export default function BatchOverfilledPage() {
                     ))}
                   </tr>
 
-                  {/* ✅ SYARAT - Selalu muncul (tidak perlu allFilled) */}
+                  {/* SYARAT - Selalu muncul */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td colSpan={materials.length + 1} className="px-3 pt-4 pb-1">
                       <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9CA3AF' : '#6B7280' }}>
@@ -860,16 +927,18 @@ export default function BatchOverfilledPage() {
                     </td>
                   </tr>
 
-                  {/* ✅ Tabel Syarat - Selalu tampil dengan threshold dari database */}
+                  {/* Tabel Syarat - dengan MS/TMS yang bener */}
                   {materials.map((rowMat, i) => {
                     const isPivot = i === pivotIndex
+                    const cr = criteriaResults[i]
+                    const statusColor = cr?.status === 'MS' ? 'text-green-500' : 'text-red-500'
                     
                     return (
                       <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                         <td className={cn('px-3 py-2.5 text-sm whitespace-nowrap min-w-[180px]', isDark ? 'text-gray-300' : 'text-gray-600')}>
                           <span>Overfilled {rowMat.label}{isPivot ? ' ⭐' : ''}</span>
-                          <span className={cn('ml-2 text-xs font-bold', 'text-gray-400')}>
-                            (TMS)
+                          <span className={cn('ml-2 text-xs font-bold', statusColor)}>
+                            ({cr?.status || 'TMS'})
                           </span>
                         </td>
                         {materials.map((_, j) => {
@@ -882,8 +951,8 @@ export default function BatchOverfilledPage() {
                           }
                           const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
                           if (th) {
-                            const minVal = parseFloat(th.min_ratio.toFixed(5)).toString()
-                            const maxVal = parseFloat(th.max_ratio.toFixed(5)).toString()
+                            const minVal = parseFloat(th.min_ratio.toFixed(3)).toString()
+                            const maxVal = parseFloat(th.max_ratio.toFixed(3)).toString()
                             return (
                               <td key={j} className="px-3 py-2 text-center whitespace-nowrap">
                                 <span className="text-gray-600 dark:text-gray-400">
@@ -902,7 +971,7 @@ export default function BatchOverfilledPage() {
                     )
                   })}
 
-                  {/* ✅ Kesimpulan - full width */}
+                  {/* Kesimpulan - full width */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
                       Kesimpulan

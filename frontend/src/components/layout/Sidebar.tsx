@@ -1,4 +1,3 @@
-// frontend/src/components/layout/Sidebar.tsx
 import { NavLink } from 'react-router-dom'
 import {
   Calculator,
@@ -18,6 +17,8 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
+import b7LogoWhite from '../../assets/B7-logo-white.png'
+
 const calcItems = [
   { name: 'Batch Overfilled', path: '/perhitungan/batch-overfilled' },
   { name: 'Batch Khusus', path: '/perhitungan/batch-khusus' },
@@ -33,7 +34,6 @@ const adminItems = [
   { name: 'Batch Khusus', path: '/admin/batch-khusus' },
 ]
 
-// Helper to read persisted boolean from localStorage; returns `fallback` if not set
 function readStorage(key: string, fallback: boolean): boolean {
   try {
     const val = localStorage.getItem(key)
@@ -48,7 +48,6 @@ function writeStorage(key: string, value: boolean) {
   try {
     localStorage.setItem(key, String(value))
   } catch {
-    // ignore
   }
 }
 
@@ -57,7 +56,6 @@ export default function Sidebar() {
   const { theme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
 
-  // Default closed (false) on first visit; persisted across refreshes
   const [calcOpen, setCalcOpen] = useState(() => readStorage('sidebar_calcOpen', false))
   const [reportOpen, setReportOpen] = useState(() => readStorage('sidebar_reportOpen', false))
   const [adminOpen, setAdminOpen] = useState(() => readStorage('sidebar_adminOpen', false))
@@ -92,7 +90,6 @@ export default function Sidebar() {
       className={`${collapsed ? 'w-[72px]' : 'w-64'} transition-all duration-300 ease-in-out
         flex flex-col h-screen ${bg} text-white shadow-xl relative flex-shrink-0`}
     >
-      {/* Header / Logo */}
       <div className="border-b border-white/10 relative">
         {collapsed ? (
           <div className="py-5 flex items-center justify-center">
@@ -106,7 +103,7 @@ export default function Sidebar() {
         ) : (
           <div className="py-4 pl-5 pr-4 flex items-center justify-between h-20 overflow-hidden">
             <img
-              src="/src/assets/B7-logo-white.png"
+              src={b7LogoWhite}
               alt="Bintang Toedjoe"
               className="h-24 w-auto object-contain object-top -mt-2"
             />
@@ -120,9 +117,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Navigation */}
       <nav className={`flex-1 px-3 py-5 space-y-1 ${collapsed ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin'}`}>
-        {/* Perhitungan */}
         {canCalc && (
           <div>
             {collapsed ? (
@@ -155,7 +150,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Report */}
         {canReport && (
           <div>
             {collapsed ? (
@@ -188,7 +182,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Admin - Manajemen */}
         {isAdmin && (
           <div>
             {collapsed ? (
@@ -221,7 +214,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* ✅ TEMPLATE REPORT - Admin Only */}
         {isAdmin && (
           <div className="pt-2">
             {collapsed ? (
@@ -232,7 +224,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* ✅ DOWNLOAD REPORT - All Users */}
         {canReport && (
           <div>
             {collapsed ? (
@@ -243,7 +234,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Manajemen User & Log - hanya untuk admin */}
         {isAdmin && (
           <div className="pt-2 space-y-1">
             {!collapsed && (
@@ -257,7 +247,6 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* Footer — logout only */}
       <div className="border-t border-white/10 p-3">
         <button
           onClick={logout}

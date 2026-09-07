@@ -22,26 +22,21 @@ import (
 func main() {
 	cfg := config.Load()
 
-	// Database
 	db, err := repository.New(cfg.DBConnStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	log.Println("Connected to database")
 
-	// Run migrations
 	if err := db.Migrate(context.Background()); err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}
 	log.Println("Migrations applied")
 
-	// Seed default admin
 	seedAdmin(db, cfg)
 
-	// JWT service
 	jwtSvc := auth.NewService(cfg.JWTSecret)
 
-	// Initialize ALL handlers
 	authHandler := handlers.NewAuthHandler(db, jwtSvc)
 	userHandler := handlers.NewUserHandler(db)
 	bkHandler := handlers.NewBatchKhususHandler(db)
@@ -51,17 +46,18 @@ func main() {
 	reportTemplateHandler := handlers.NewReportTemplateHandler(db)
 	reportDownloadHandler := handlers.NewReportDownloadHandler(db)
 
-	// Gin router
 	r := gin.Default()
 
-	// Serve static files
+	r.MaxMultipartMemory = 10 << 20
+
+	r.Use(middleware.ErrorHandler())
+
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Failed to get working directory: %v", err)
 	}
 	r.Static("/uploads", filepath.Join(wd, "uploads"))
 
-	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{cfg.FrontendOrigin},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -72,7 +68,6 @@ func main() {
 
 	api := r.Group("/api")
 
-	// Auth routes (no JWT required for login/refresh)
 	authGroup := api.Group("/auth")
 	{
 		authGroup.POST("/login", authHandler.Login)
@@ -82,67 +77,55 @@ func main() {
 		authGroup.GET("/me", middleware.Auth(jwtSvc), authHandler.Me)
 	}
 
-	// Protected routes
 	protected := api.Group("", middleware.Auth(jwtSvc))
 	{
-		// Batch Khusus
 		protected.GET("/batch-khusus/products", bkHandler.ListProducts)
 		protected.GET("/batch-khusus/products/:kode", bkHandler.GetProduct)
 		protected.GET("/batch-khusus/reports", bkHandler.ListReports)
 		protected.GET("/batch-khusus/reports/product/:kode", bkHandler.GetProductReports)
 		protected.GET("/batch-khusus/reports/latest/:kode", bkHandler.GetLatestReport)
 
-		// Batch Overfilled
 		protected.GET("/batch-overfilled/products", boHandler.ListProducts)
 		protected.GET("/batch-overfilled/products/:kode", boHandler.GetProduct)
 		protected.GET("/batch-overfilled/reports", boHandler.ListReports)
 		protected.GET("/batch-overfilled/reports/product/:kode", boHandler.GetProductReports)
 		protected.GET("/batch-overfilled/reports/latest/:kode", boHandler.GetLatestReport)
 
-		// Download routes
 		protected.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
 		protected.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
 		protected.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
 
-		// Simpan laporan – admin, ts, produksi
 		calcGroup := protected.Group("", middleware.RequireRole("admin", "ts", "produksi"))
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
 			calcGroup.POST("/batch-overfilled/reports", boHandler.CreateReport)
 		}
 
-		// Admin & TS only routes (full access)
 		adminGroup := protected.Group("", middleware.AdminOrTSOnly())
 		{
-			// User management
 			adminGroup.GET("/users", userHandler.List)
 			adminGroup.POST("/users", userHandler.Create)
 			adminGroup.PUT("/users/:id", userHandler.Update)
 			adminGroup.DELETE("/users/:id", userHandler.Delete)
 
-			// Activity logs
 			adminGroup.GET("/logs", logHandler.List)
 			adminGroup.GET("/logs/:id", logHandler.Detail)
 
-			// Delete reports
 			adminGroup.DELETE("/batch-khusus/reports/:id", bkHandler.DeleteReport)
 			adminGroup.DELETE("/batch-overfilled/reports/:id", boHandler.DeleteReport)
 
-			// Admin - Batch Khusus
 			adminGroup.GET("/admin/bk/products", adminHandler.ListBKProducts)
 			adminGroup.GET("/admin/bk/products/:id", adminHandler.GetBKProduct)
 			adminGroup.POST("/admin/bk/products", adminHandler.CreateBKProduct)
 			adminGroup.PUT("/admin/bk/products/:id", adminHandler.UpdateBKProduct)
 			adminGroup.DELETE("/admin/bk/products/:id", adminHandler.DeleteBKProduct)
 
-			// Admin - Batch Overfilled
 			adminGroup.GET("/admin/bo/products", adminHandler.ListBOProducts)
 			adminGroup.GET("/admin/bo/products/:id", adminHandler.GetBOProduct)
 			adminGroup.POST("/admin/bo/products", adminHandler.CreateBOProduct)
 			adminGroup.PUT("/admin/bo/products/:id", adminHandler.UpdateBOProduct)
 			adminGroup.DELETE("/admin/bo/products/:id", adminHandler.DeleteBOProduct)
 
-			// Report Template - FULL CRUD + Download
 			adminGroup.GET("/admin/report-templates", reportTemplateHandler.ListTemplates)
 			adminGroup.POST("/admin/report-templates", reportTemplateHandler.UploadTemplate)
 			adminGroup.GET("/admin/report-templates/:id", reportTemplateHandler.GetTemplate)
@@ -151,7 +134,6 @@ func main() {
 		}
 	}
 
-	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})

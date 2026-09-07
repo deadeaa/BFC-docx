@@ -1,4 +1,3 @@
-// frontend/src/router/AppRouter.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '../context/AuthContext'
 import { ThemeProvider } from '../context/ThemeContext'
@@ -23,7 +22,9 @@ import AdminBatchOverfilledPage from '../components/pages/AdminBOPage'
 import AdminReportTemplatePage from '../components/pages/AdminUpTemplatePage'
 import DownloadReportPage from '../components/pages/DownloadReportPage'
 
-
+import Error404 from '../components/pages/Error404'
+import Error500 from '../components/pages/Error500'
+import Error503 from '../components/pages/Error503'
 
 export default function AppRouter() {
   return (
@@ -36,7 +37,10 @@ export default function AppRouter() {
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/" element={<Navigate to="/welcome" replace />} />
 
-            {/* Protected routes */}
+            <Route path="/500" element={<Error500 />} />
+            <Route path="/503" element={<Error503 />} />
+            <Route path="*" element={<Error404 />} />
+
             <Route
               path="/welcome"
               element={
@@ -69,7 +73,6 @@ export default function AppRouter() {
               }
             />
             
-            {/* Perhitungan – admin + produksi + qa */}
             <Route
               path="/perhitungan/batch-overfilled"
               element={
@@ -91,7 +94,6 @@ export default function AppRouter() {
               }
             />
 
-            {/* Report – all roles */}
             <Route
               path="/report/batch-overfilled"
               element={
@@ -113,7 +115,6 @@ export default function AppRouter() {
               }
             />
 
-            // Admin only
             <Route
               path="/admin/report-templates"
               element={
@@ -125,7 +126,6 @@ export default function AppRouter() {
               }
             />
 
-            // All roles (user bisa download)
             <Route
               path="/download-report"
               element={
@@ -136,7 +136,6 @@ export default function AppRouter() {
                 </RequireAuth>
               }
             />
-            {/* Admin-only */}
             <Route
               path="/users"
               element={
@@ -158,7 +157,6 @@ export default function AppRouter() {
               }
             />
 
-            {/* Unauthorized */}
             <Route
               path="/unauthorized"
               element={
@@ -170,7 +168,6 @@ export default function AppRouter() {
               }
             />
 
-            {/* Fallback */}
             <Route path="*" element={<Navigate to="/welcome" replace />} />
           </Routes>
         </AuthProvider>

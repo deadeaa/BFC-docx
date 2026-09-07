@@ -1,29 +1,46 @@
+// import { useAuth } from '../../context/AuthContext'
+// import { useTheme } from '../../context/ThemeContext'
+
+// const PRODUCTS = [
+//   { src: '/src/assets/extrajoss.png',   top: '5%',  left: '1%',  rot:  3, delay: '0.0s', spd: 9  },
+//   { src: '/src/assets/komix.png',       top: '22%', left: '6%',  rot: -5, delay: '0.5s', spd: 7  },
+//   { src: '/src/assets/femmy.png',       top: '55%', left: '2%',  rot:  4, delay: '0.9s', spd: 6  },
+//   { src: '/src/assets/puyer.png',       top: '75%', left: '3%',  rot: -3, delay: '1.3s', spd: 8  },
+
+//   { src: '/src/assets/bejo.png',        top: '4%',  left: '83%', rot:  5, delay: '0.2s', spd: 9  },
+//   { src: '/src/assets/ejsport.png',     top: '20%', left: '87%', rot: -4, delay: '0.7s', spd: 7  },
+//   { src: '/src/assets/slasi.png',       top: '55%', left: '86%', rot: -3, delay: '1.1s', spd: 6  },
+//   { src: '/src/assets/komixherbal.png', top: '72%', left: '83%', rot: -5, delay: '1.5s', spd: 8  },
+//   { src: '/src/assets/waisan.png',      top: '82%', left: '88%', rot:  3, delay: '1.9s', spd: 5  },
+// ]
+
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
-// Safe zones: left edge (0–18%) and right edge (82–100%) only
-// Center zone (18%–82%) is completely clear — no products
-// Products strictly in 4 corners, no center drift
-const PRODUCTS = [
-  // TOP-LEFT — 2 products, stacked
-  { src: '/src/assets/extrajoss.png',   top: '5%',  left: '1%',  rot:  3, delay: '0.0s', spd: 9  },
-  { src: '/src/assets/komix.png',       top: '22%', left: '6%',  rot: -5, delay: '0.5s', spd: 7  },
-  // MID-LEFT — 1 product
-  { src: '/src/assets/femmy.png',       top: '55%', left: '2%',  rot:  4, delay: '0.9s', spd: 6  },
-  // BOTTOM-LEFT — 1 product
-  { src: '/src/assets/puyer.png',       top: '75%', left: '3%',  rot: -3, delay: '1.3s', spd: 8  },
+import extrajoss from '../../assets/extrajoss.png'
+import komix from '../../assets/komix.png'
+import femmy from '../../assets/femmy.png'
+import puyer from '../../assets/puyer.png'
+import bejo from '../../assets/bejo.png'
+import ejsport from '../../assets/ejsport.png'
+import slasi from '../../assets/slasi.png'
+import komixherbal from '../../assets/komixherbal.png'
+import waisan from '../../assets/waisan.png'
 
-  // TOP-RIGHT — 2 products, stacked
-  { src: '/src/assets/bejo.png',        top: '4%',  left: '83%', rot:  5, delay: '0.2s', spd: 9  },
-  { src: '/src/assets/ejsport.png',     top: '20%', left: '87%', rot: -4, delay: '0.7s', spd: 7  },
-  // MID-RIGHT — 1 product
-  { src: '/src/assets/slasi.png',       top: '55%', left: '86%', rot: -3, delay: '1.1s', spd: 6  },
-  // BOTTOM-RIGHT — 2 products
-  { src: '/src/assets/komixherbal.png', top: '72%', left: '83%', rot: -5, delay: '1.5s', spd: 8  },
-  { src: '/src/assets/waisan.png',      top: '82%', left: '88%', rot:  3, delay: '1.9s', spd: 5  },
+const PRODUCTS = [
+  { src: extrajoss,    top: '5%',  left: '1%',  rot:  3, delay: '0.0s', spd: 9 },
+  { src: komix,        top: '22%', left: '6%',  rot: -5, delay: '0.5s', spd: 7 },
+  { src: femmy,        top: '55%', left: '2%',  rot:  4, delay: '0.9s', spd: 6 },
+  { src: puyer,        top: '75%', left: '3%',  rot: -3, delay: '1.3s', spd: 8 },
+
+  { src: bejo,         top: '4%',  left: '83%', rot:  5, delay: '0.2s', spd: 9 },
+  { src: ejsport,      top: '20%', left: '87%', rot: -4, delay: '0.7s', spd: 7 },
+  { src: slasi,        top: '55%', left: '86%', rot: -3, delay: '1.1s', spd: 6 },
+  { src: komixherbal,  top: '72%', left: '83%', rot: -5, delay: '1.5s', spd: 8 },
+  { src: waisan,       top: '82%', left: '88%', rot:  3, delay: '1.9s', spd: 5 },
 ]
 
-const SIZE = 88 // px — all identical
+const SIZE = 88 
 
 function toTitleCase(s: string) {
   return s.toLowerCase().split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
@@ -75,7 +92,6 @@ export default function WelcomePage() {
         .dot { animation: blink 2.4s ease-in-out infinite; }
       `}</style>
 
-      {/* ── Root ──────────────────────────────────────────────── */}
       <div className="pg" style={{
         minHeight: '100%',
         position: 'relative',
@@ -87,7 +103,6 @@ export default function WelcomePage() {
         background: bg,
       }}>
 
-        {/* Subtle grain */}
         <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:0, opacity: isDark ? 0.5 : 0.35 }}>
           <filter id="gr">
             <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
@@ -96,7 +111,6 @@ export default function WelcomePage() {
           <rect width="100%" height="100%" filter="url(#gr)" opacity="0.04"/>
         </svg>
 
-        {/* Soft center light */}
         <div style={{
           position:'absolute', inset:0, zIndex:1, pointerEvents:'none',
           background: isDark
@@ -104,7 +118,6 @@ export default function WelcomePage() {
             : 'radial-gradient(ellipse 50% 45% at 50% 45%, rgba(255,255,255,0.65) 0%, transparent 100%)',
         }}/>
 
-        {/* ── Floating products — LEFT EDGE ONLY ───────────────── */}
         {PRODUCTS.map((p, i) => (
           <div key={i} style={{
             position: 'absolute',
@@ -126,7 +139,6 @@ export default function WelcomePage() {
           </div>
         ))}
 
-        {/* ── HERO CENTER — z:20, narrow, purely text flow ──────── */}
         <div style={{
           position: 'relative',
           zIndex: 20,
@@ -137,11 +149,9 @@ export default function WelcomePage() {
           width: '100%',
           maxWidth: '440px',
           padding: '0 20px',
-          /* Push content slightly above center */
           marginTop: '-40px',
         }}>
 
-          {/* Date + Online badge */}
           <div className="u1" style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             flexWrap: 'wrap', justifyContent: 'center',
@@ -164,7 +174,6 @@ export default function WelcomePage() {
             </span>
           </div>
 
-          {/* Eyebrow */}
           <p className="u2" style={{
             fontSize:'11px', fontWeight:700, letterSpacing:'0.18em',
             textTransform:'uppercase',
@@ -174,7 +183,6 @@ export default function WelcomePage() {
             {greeting}
           </p>
 
-          {/* "Selamat datang," */}
           <p className="u3" style={{
             fontSize:'2rem', fontWeight:700, lineHeight:1.25,
             letterSpacing:'-0.018em',
@@ -184,7 +192,6 @@ export default function WelcomePage() {
             Selamat datang,
           </p>
 
-          {/* Name — same size, green */}
           <p className="u3" style={{
             fontSize:'2rem', fontWeight:800, lineHeight:1.25,
             letterSpacing:'-0.018em',
@@ -195,7 +202,6 @@ export default function WelcomePage() {
             {name}
           </p>
 
-          {/* Divider */}
           <div className="u4" style={{
             width:'28px', height:'1.5px', borderRadius:'2px',
             background: isDark
@@ -204,7 +210,6 @@ export default function WelcomePage() {
             marginBottom:'18px', opacity:0.5,
           }}/>
 
-          {/* Body */}
           <p className="u4" style={{
             fontSize:'14px', fontWeight:400, lineHeight:1.85,
             color: isDark ? '#5a7860' : '#3d5c42',

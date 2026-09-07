@@ -66,7 +66,7 @@ function getDefaultMaterialName(index: number, kodeProduk: string): string {
     case 2:
       return '2AC006000J'
     case 3:
-      return '2AS012000J'
+      return '2AS012000'
     default:
       return ''
   }

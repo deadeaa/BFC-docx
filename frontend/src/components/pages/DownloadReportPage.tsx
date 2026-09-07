@@ -1,6 +1,6 @@
 // frontend/src/components/pages/DownloadReportPage.tsx
 import { useState, useEffect, useCallback } from 'react'
-import { FileDown, ChevronDown, AlertCircle, CheckCircle2, FileText, Calendar, User, Tag } from 'lucide-react'
+import { FileDown, ChevronDown, AlertCircle, CheckCircle2, FileText, Tag } from 'lucide-react'
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
@@ -31,6 +31,7 @@ export default function DownloadReportPage() {
 
   const [products, setProducts] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
+  const [jenisProduk, setJenisProduk] = useState<'ruah' | 'minor' | ''>('')
 
   const [bkReports, setBkReports] = useState<BKReport[]>([])
   const [selectedBK, setSelectedBK] = useState<BKReport | null>(null)
@@ -54,6 +55,23 @@ export default function DownloadReportPage() {
       })
       .catch(() => {})
   }, [])
+
+  // ============================================================
+  // GET FILTERED PRODUCTS BASED ON JENIS PRODUK
+  // ============================================================
+  const filteredProducts = products.filter((p) => {
+    const kode = p.kode_produk.toUpperCase()
+    
+    if (jenisProduk === 'ruah') {
+      // Kode produk ruah: PEBJ3, PEBJ4, PBSJ1, dll (dimulai dengan P atau B)
+      return kode.startsWith('P') || kode.startsWith('B')
+    } else if (jenisProduk === 'minor') {
+      // Kode produk minor: XEBJ3, XEBJ4, XBSJ1, dll (dimulai dengan X)
+      return kode.startsWith('X')
+    }
+    
+    return true // default: semua
+  })
 
   // ============================================================
   // LOAD BK REPORTS
@@ -102,7 +120,19 @@ export default function DownloadReportPage() {
   }
 
   // ============================================================
-  // ✅ FORMAT DATE - ROBUST
+  // HANDLE JENIS PRODUK CHANGE
+  // ============================================================
+  const handleJenisProdukChange = (value: 'ruah' | 'minor' | '') => {
+    setJenisProduk(value)
+    setSelectedKode('')
+    setSelectedBK(null)
+    setBkReports([])
+    setError('')
+    setSuccess('')
+  }
+
+  // ============================================================
+  // FORMAT DATE
   // ============================================================
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-'
@@ -110,22 +140,17 @@ export default function DownloadReportPage() {
     try {
       let date: Date
       
-      // Coba parse langsung
       date = new Date(dateStr)
       
-      // Kalau invalid, coba format DD-MM-YYYY
       if (isNaN(date.getTime())) {
         const parts = dateStr.split('-')
         if (parts.length === 3 && parts[0].length === 2) {
-          // format: DD-MM-YYYY
           date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
         } else if (parts.length === 3 && parts[0].length === 4) {
-          // format: YYYY-MM-DD
           date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
         }
       }
       
-      // Kalau masih invalid, coba split dengan '/'
       if (isNaN(date.getTime())) {
         const parts = dateStr.split('/')
         if (parts.length === 3) {
@@ -133,7 +158,6 @@ export default function DownloadReportPage() {
         }
       }
       
-      // Kalau masih invalid, return original string
       if (isNaN(date.getTime())) {
         return dateStr
       }
@@ -243,70 +267,102 @@ export default function DownloadReportPage() {
               Download Report Batch Khusus
             </h1>
             <p className={cn('text-sm mt-0.5', isDark ? 'text-gray-400' : 'text-gray-500')}>
-              Pilih produk dan batch, lalu download report BK
+              Pilih jenis produk, produk, dan batch, lalu download report BK
             </p>
           </div>
         </div>
       </div>
 
       <div className={cn('rounded-xl p-5 shadow-sm', card)}>
-        {/* Pilih Produk */}
+        {/* ✅ Pilih Jenis Produk */}
         <div className="mb-4">
           <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
-            Kode Produk <span className="text-red-500">*</span>
+            Jenis Produk <span className="text-red-500">*</span>
           </label>
           <div className="relative max-w-md">
             <select
-              value={selectedKode}
-              onChange={(e) => handleSelectKode(e.target.value)}
+              value={jenisProduk}
+              onChange={(e) => handleJenisProdukChange(e.target.value as 'ruah' | 'minor' | '')}
               className={cn(inputBase, 'pr-9 appearance-none cursor-pointer')}
             >
-              <option value="">-- Pilih Produk --</option>
-              {products.map((p) => (
-                <option key={p.kode_produk} value={p.kode_produk}>
-                  {p.kode_produk} – {p.nama_produk}
-                </option>
-              ))}
+              <option value="">-- Pilih Jenis Produk --</option>
+              <option value="ruah">Produk Ruah</option>
+              <option value="minor">Produk Minor</option>
             </select>
             <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
           </div>
+          <p className="text-xs text-gray-400 mt-1">
+            {jenisProduk === 'ruah' && '📦 Produk ruah: PEBJ3, PEBJ4, PBSJ1, dll'}
+            {jenisProduk === 'minor' && '🧪 Produk minor: XEBJ3, XEBJ4, XBSJ1, dll'}
+          </p>
         </div>
 
-        {/* Pilih BK Report */}
-        <div className="mb-4">
-          <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
-            <TypeBadge type="BK" /> Pilih Batch
-          </label>
-          <div className="relative max-w-md">
-            <select
-              value={selectedBK?.id || ''}
-              onChange={(e) => {
-                const report = bkReports.find(r => r.id === parseInt(e.target.value))
-                setSelectedBK(report || null)
-              }}
-              disabled={!selectedKode || loadingBK}
-              className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', 'disabled:opacity-50')}
-            >
-              <option value="">-- Pilih Batch --</option>
-              {bkReports.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.no_batch} ({formatDate(r.tgl_pembuatan)})
-                  {r.created_by_name && ` - ${r.created_by_name}`}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-          </div>
-          {loadingBK && (
-            <div className="flex items-center gap-2 mt-1">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-brand-green border-t-transparent" />
-              <p className="text-xs text-gray-400">Memuat data batch...</p>
+        {/* Pilih Produk - Hanya tampil setelah pilih jenis */}
+        {jenisProduk && (
+          <div className="mb-4">
+            <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
+              Kode Produk <span className="text-red-500">*</span>
+            </label>
+            <div className="relative max-w-md">
+              <select
+                value={selectedKode}
+                onChange={(e) => handleSelectKode(e.target.value)}
+                className={cn(inputBase, 'pr-9 appearance-none cursor-pointer')}
+              >
+                <option value="">-- Pilih Produk --</option>
+                {filteredProducts.map((p) => (
+                  <option key={p.kode_produk} value={p.kode_produk}>
+                    {p.kode_produk} – {p.nama_produk}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
             </div>
-          )}
-          {!loadingBK && bkReports.length === 0 && selectedKode && (
-            <p className="text-xs text-yellow-500 mt-1">⚠️ Belum ada report BK untuk produk ini</p>
-          )}
-        </div>
+            {filteredProducts.length === 0 && (
+              <p className="text-xs text-yellow-500 mt-1">
+                ⚠️ Tidak ada produk {jenisProduk} tersedia
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Pilih BK Report */}
+        {selectedKode && (
+          <div className="mb-4">
+            <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
+              <TypeBadge type="BK" /> Pilih Batch
+            </label>
+            <div className="relative max-w-md">
+              <select
+                value={selectedBK?.id || ''}
+                onChange={(e) => {
+                  const report = bkReports.find(r => r.id === parseInt(e.target.value))
+                  setSelectedBK(report || null)
+                }}
+                disabled={!selectedKode || loadingBK}
+                className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', 'disabled:opacity-50')}
+              >
+                <option value="">-- Pilih Batch --</option>
+                {bkReports.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.no_batch} ({formatDate(r.tgl_pembuatan)})
+                    {r.created_by_name && ` - ${r.created_by_name}`}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+            </div>
+            {loadingBK && (
+              <div className="flex items-center gap-2 mt-1">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-brand-green border-t-transparent" />
+                <p className="text-xs text-gray-400">Memuat data batch...</p>
+              </div>
+            )}
+            {!loadingBK && bkReports.length === 0 && selectedKode && (
+              <p className="text-xs text-yellow-500 mt-1">⚠️ Belum ada report BK untuk produk ini</p>
+            )}
+          </div>
+        )}
 
         {/* Preview pilihan */}
         {selectedBK && (
