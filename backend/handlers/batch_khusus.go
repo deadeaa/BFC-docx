@@ -42,7 +42,7 @@ func computeBKMaterialValues(product *models.BKProduct, inputSisaMinor float64) 
 		} else if m.MaterialIndex == 0 {
 			values[i] = (inputSisaMinor / d4) * m.QtyPerSachet
 		} else if m.MaterialIndex == 2 {
-]			values[i] = (inputSisaMinor / d4) * m.QtyPerSachet
+			values[i] = (inputSisaMinor / d4) * m.QtyPerSachet
 		} else {
 			var e4 float64 = 1.0
 			var qtyIndex2 float64 = 0
