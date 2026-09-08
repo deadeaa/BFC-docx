@@ -1,4 +1,3 @@
-// frontend/src/components/pages/BatchOverfilledPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
 import api from '../../lib/api'
@@ -6,8 +5,6 @@ import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 import HistoryModal from '../../components/HistoryModal'
 import { useAuth } from '../../context/AuthContext'
-
-// ── Types ────────────────────────────────────────────────────
 
 interface BOMaterial {
   id: number
@@ -84,8 +81,6 @@ interface BOReport {
   created_at: string
 }
 
-// ── Helpers ──────────────────────────────────────────────────
-
 const EPS = 1e-9
 
 function fmt(v: number | null | undefined): string {
@@ -119,15 +114,12 @@ function findPivotIndex(ratioValues: number[]): number {
   return maxIdx
 }
 
-// ── Calculate Criteria - PERBAIKAN ─────────────────────────
-
 function calculateCriteria(
   materials: BOMaterial[],
   ratio: (number | null)[],
   thresholds: BOThreshold[],
   allFilled: boolean
 ): CriteriaResult[] {
-  // Kalau belum semua input diisi, semua TMS
   if (!allFilled) {
     return materials.map((m, i) => ({
       materialIndex: i,
@@ -211,8 +203,6 @@ function calculateCriteria(
   })
 }
 
-// ── Main Component ───────────────────────────────────────────
-
 export default function BatchOverfilledPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -238,7 +228,6 @@ export default function BatchOverfilledPage() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
 
-  // Load product list
   useEffect(() => {
     api.get<ProductOption[]>('/batch-overfilled/products')
       .then(res => setProductList(res.data))
@@ -295,14 +284,13 @@ export default function BatchOverfilledPage() {
     ? findPivotIndex(ratio as number[]) 
     : -1
   
-  // ✅ FIX: Ambil pivot result dari criteriaResults berdasarkan pivotIndex
+  // Ambil pivot result dari criteriaResults berdasarkan pivotIndex
   const pivotResult = pivotIndex >= 0 ? criteriaResults[pivotIndex] : undefined
   const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
   
   const targetBaru = materials.map(m => (nilaiTertinggi != null ? m.target_kg * nilaiTertinggi : null))
   const tambahanReproses = targetBaru.map((f, i) => (f != null && hasilBatching[i] != null ? f - (hasilBatching[i] as number) : null))
 
-  // ── Load History ─────────────────────────────────────────────
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
     if (!targetKode) {
@@ -327,7 +315,7 @@ export default function BatchOverfilledPage() {
         params
       })
       
-      console.log(`✅ History loaded: ${res.data?.length || 0} items`)
+      console.log(`History loaded: ${res.data?.length || 0} items`)
       
       if (params.no_batch) {
         console.log(`📊 Filtered by batch: ${params.no_batch}`)
@@ -350,7 +338,6 @@ export default function BatchOverfilledPage() {
     }
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
-  // ── Handle select product ────────────────────────────────────
   const handleSelectKode = useCallback(async (kode: string) => {
     setSelectedKode(kode)
     setProduct(null)
@@ -380,7 +367,6 @@ export default function BatchOverfilledPage() {
       const directCount = Math.max(safeProduct.materials.length - 1, 0)
       setInputRaws(new Array(directCount).fill(''))
       
-      // Load latest report
       try {
         const reportRes = await api.get<BOReport>(`/batch-overfilled/reports/latest/${kode}`)
         if (reportRes.data && reportRes.data.detail_json) {
@@ -403,7 +389,6 @@ export default function BatchOverfilledPage() {
         setNoBatch('')
       }
       
-      // Load history
       await loadHistory(kode)
       
     } catch (err) {
@@ -415,7 +400,6 @@ export default function BatchOverfilledPage() {
     }
   }, [loadHistory])
 
-  // ── Save ──────────────────────────────────────────────────────
   async function handleSave() {
     if (!product || !tglPembuatan) {
       setSaveError('Lengkapi Tanggal Pembuatan sebelum menyimpan.')
@@ -485,7 +469,6 @@ export default function BatchOverfilledPage() {
     }
   }
 
-  // ── Export PDF ──────────────────────────────────────────────
   function handleExportPDF() {
     if (!product || !allFilled || nilaiTertinggi == null || bobotTotal == null) return
     
@@ -546,7 +529,6 @@ export default function BatchOverfilledPage() {
         ${ratio.map(v => `<td class="num">${getValue(v)}</td>`).join('')}
       </tr>`
 
-    // Syarat - selalu tampil
     const syaratRows = materials.map((rowMat, i) => {
       const isPivot = i === pivotIndex
       
@@ -563,7 +545,6 @@ export default function BatchOverfilledPage() {
         return `<td class="num text-gray-400">-</td>`
       }).join('')
       
-      // ✅ Tampilkan status MS/TMS yang bener
       const cr = criteriaResults[i]
       const statusColor = cr?.status === 'MS' ? 'text-green-500' : 'text-red-500'
       
@@ -671,7 +652,6 @@ export default function BatchOverfilledPage() {
     win.onload = () => { win.print() }
   }
 
-  // ── Styling ───────────────────────────────────────────────────
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -705,7 +685,6 @@ export default function BatchOverfilledPage() {
 
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <div className="p-2 rounded-lg bg-brand-green/10">
@@ -728,7 +707,6 @@ export default function BatchOverfilledPage() {
         </p>
       </div>
 
-      {/* Pilih Kode Produk */}
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
         <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
           Kode Produk
@@ -750,7 +728,6 @@ export default function BatchOverfilledPage() {
         </div>
       </div>
 
-      {/* Loading */}
       {loadingProduct && (
         <div className={cn('rounded-xl p-8 text-center shadow-sm', card)}>
           <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-green border-t-transparent mb-2" />
@@ -758,7 +735,6 @@ export default function BatchOverfilledPage() {
         </div>
       )}
 
-      {/* Tombol Riwayat */}
       {product && !loadingProduct && (
         <div className="mb-4 flex justify-end gap-3">
           <button
@@ -783,11 +759,9 @@ export default function BatchOverfilledPage() {
         </div>
       )}
 
-      {/* Tabel Perhitungan */}
       {product && !loadingProduct && (
         <>
           <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
-            {/* Info produk */}
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
                 <span className={cn('text-xs font-medium', isDark ? 'text-gray-400' : 'text-gray-500')}>Kode Produk</span>
@@ -799,7 +773,6 @@ export default function BatchOverfilledPage() {
               </div>
             </div>
 
-            {/* "ISI DI BARIS INI" */}
             <div className="overflow-x-auto mb-5">
               <table className="w-full text-sm">
                 <thead>
@@ -840,7 +813,6 @@ export default function BatchOverfilledPage() {
               </table>
             </div>
 
-            {/* Tabel utama */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -913,7 +885,6 @@ export default function BatchOverfilledPage() {
                     ))}
                   </tr>
 
-                  {/* SYARAT - Selalu muncul */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td colSpan={materials.length + 1} className="px-3 pt-4 pb-1">
                       <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9CA3AF' : '#6B7280' }}>
@@ -927,7 +898,6 @@ export default function BatchOverfilledPage() {
                     </td>
                   </tr>
 
-                  {/* Tabel Syarat - dengan MS/TMS yang bener */}
                   {materials.map((rowMat, i) => {
                     const isPivot = i === pivotIndex
                     const cr = criteriaResults[i]
@@ -971,7 +941,6 @@ export default function BatchOverfilledPage() {
                     )
                   })}
 
-                  {/* Kesimpulan - full width */}
                   <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                     <td className={cn('px-3 py-2.5 text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
                       Kesimpulan
@@ -1020,7 +989,6 @@ export default function BatchOverfilledPage() {
             </div>
           </div>
 
-          {/* Form Simpan & Export */}
           <div className={cn('rounded-xl p-5 shadow-sm', card)}>
             <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
               Simpan & Export
@@ -1118,7 +1086,6 @@ export default function BatchOverfilledPage() {
         </>
       )}
 
-      {/* History Modal */}
       {showHistory && (
         <HistoryModal
           isOpen={showHistory}

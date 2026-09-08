@@ -1,9 +1,7 @@
-// backend/models/report.go
 package models
 
 import "time"
 
-// ReportDetail - struktur untuk detail perhitungan yang disimpan di JSON
 type ReportDetail struct {
 	Materials []struct {
 		KodeMaterial    string  `json:"kode_material"`
@@ -33,7 +31,6 @@ type ReportDetail struct {
 	Kesimpulan string `json:"kesimpulan"`
 }
 
-// ReportTemplate - untuk template DOCX
 type ReportTemplate struct {
 	ID          int       `json:"id" db:"id"`
 	KodeProduk  string    `json:"kode_produk" db:"kode_produk"`

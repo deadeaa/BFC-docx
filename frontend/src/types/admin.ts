@@ -1,4 +1,3 @@
-// frontend/src/types/admin.ts
 export interface AdminBKMaterial {
   id?: number
   product_id?: number

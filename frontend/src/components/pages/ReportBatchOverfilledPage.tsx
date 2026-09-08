@@ -6,8 +6,6 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 
-// ── Types ────────────────────────────────────────────────────
-
 interface BOReport {
   id: number
   kode_produk: string
@@ -31,8 +29,6 @@ interface BOReportListResponse {
 
 const PAGE_SIZE = 50
 
-// ── Helpers ──────────────────────────────────────────────────
-
 // Menampilkan Tanggal + Jam menggunakan timestamp asli dari database
 // (created_at), bukan waktu buatan. Contoh: "22 Jul 2026, 14.37"
 function fmtDateTime(dateStr: string): string {
@@ -52,13 +48,11 @@ function todayFilename(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, '/')
 }
 
-// ── Component ────────────────────────────────────────────────
-
 export default function ReportBatchOverfilledPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { hasRole } = useAuth()
-  const canDelete = hasRole('admin')
+  const canDelete = hasRole('admin', 'ts')
 
   const [reports, setReports] = useState<BOReport[]>([])
   const [total, setTotal] = useState(0)
@@ -93,7 +87,6 @@ export default function ReportBatchOverfilledPage() {
     return () => clearTimeout(t)
   }, [fetchReports])
 
-  // Reset ke halaman 1 setiap kali pencarian berubah
   useEffect(() => {
     setPage(1)
   }, [search])
@@ -113,7 +106,6 @@ export default function ReportBatchOverfilledPage() {
       await api.delete(`/batch-overfilled/reports/${deleteTarget.id}`)
       setDeleteTarget(null)
       setToast('Report berhasil dihapus')
-      // Jika halaman saat ini jadi kosong setelah hapus (dan bukan halaman 1), mundur satu halaman
       if (reports.length === 1 && page > 1) {
         setPage((p) => p - 1)
       } else {
@@ -126,7 +118,6 @@ export default function ReportBatchOverfilledPage() {
     }
   }
 
-  // ── Export XLSX (data pada halaman yang sedang ditampilkan) ────
   function handleExportXLSX() {
     const filename = `Report_Batch_Overfilled_${todayFilename()}.xlsx`
 
@@ -142,7 +133,6 @@ export default function ReportBatchOverfilledPage() {
 
     const ws = XLSX.utils.json_to_sheet(data)
 
-    // Lebar kolom
     ws['!cols'] = [
       { wch: 5 },   // No
       { wch: 14 },  // Kode Produk
@@ -158,7 +148,6 @@ export default function ReportBatchOverfilledPage() {
     XLSX.writeFile(wb, filename)
   }
 
-  // ── Styling ───────────────────────────────────────────────────
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -190,7 +179,6 @@ export default function ReportBatchOverfilledPage() {
 
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <div className="p-2 rounded-lg bg-brand-green/10">
@@ -205,7 +193,6 @@ export default function ReportBatchOverfilledPage() {
         </p>
       </div>
 
-      {/* Toolbar */}
       <div className={cn('rounded-xl p-4 mb-5 shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between', card)}>
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -244,7 +231,6 @@ export default function ReportBatchOverfilledPage() {
         </div>
       </div>
 
-      {/* Tabel */}
       <div className={cn('rounded-xl shadow-sm overflow-hidden', card)}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -320,7 +306,6 @@ export default function ReportBatchOverfilledPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && reports.length > 0 && (
           <div className={cn('flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3.5 border-t text-sm', isDark ? 'border-gray-700' : 'border-gray-100')}>
             <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
@@ -357,7 +342,6 @@ export default function ReportBatchOverfilledPage() {
         )}
       </div>
 
-      {/* Delete confirmation */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className={`w-full max-w-sm rounded-2xl shadow-2xl border p-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
@@ -391,7 +375,6 @@ export default function ReportBatchOverfilledPage() {
         </div>
       )}
 
-      {/* Toast notifikasi */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg bg-emerald-600 text-white text-sm font-medium animate-fade-in">
           <CheckCircle2 size={18} />

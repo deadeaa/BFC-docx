@@ -2,10 +2,9 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  withCredentials: true, // for refresh token cookie
+  withCredentials: true, 
 })
 
-// Attach access token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
@@ -17,13 +16,11 @@ api.interceptors.request.use((config) => {
 let refreshing = false
 let queue: Array<{ resolve: (t: string) => void; reject: (e: unknown) => void }> = []
 
-// Auto-refresh access token on 401
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
 
-    // FIX: Skip retry for the refresh-token endpoint itself to avoid infinite loop
     if (
       error.response?.status === 401 &&
       !original._retry &&
@@ -47,8 +44,6 @@ api.interceptors.response.use(
       refreshing = true
 
       try {
-        // FIX: Use the api instance (withCredentials: true) instead of bare axios
-        // so the refresh_token cookie is always included in the request
         const { data } = await axios.post(
           '/api/auth/refresh-token',
           {},

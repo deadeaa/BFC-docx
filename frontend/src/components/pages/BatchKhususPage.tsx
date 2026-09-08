@@ -1,4 +1,3 @@
-// frontend/src/components/pages/BatchKhususPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
 import api from '../../lib/api'
@@ -6,8 +5,6 @@ import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 import HistoryModalBK from '../../components/HistoryModalBK'
 import { useAuth } from '../../context/AuthContext'
-
-// ── Types ────────────────────────────────────────────────────
 
 interface BKMaterial {
   id: number
@@ -52,10 +49,8 @@ interface BKReport {
   created_at: string
 }
 
-// ── Helpers ──────────────────────────────────────────────────
-
-// Format angka dengan 3 desimal, hilangkan trailing zeros
-function fmt(v: number | null | undefined, decimals = 3): string {
+// Format angka dengan 2 desimal, hilangkan trailing zeros
+function fmt(v: number | null | undefined, decimals = 2): string {
   if (v == null || isNaN(v)) return '-'
   const formatted = v.toFixed(decimals)
   return formatted.replace(/\.?0+$/, '')
@@ -69,15 +64,12 @@ function formatDateForFilename(date: string): string {
   return date.replace(/-/g, '/')
 }
 
-// ── Main Component ───────────────────────────────────────────
-
 export default function BatchKhususPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { user } = useAuth()
 
-  // Cek apakah user admin
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = user?.role === 'admin' || user?.role === 'ts'
 
   const [productList, setProductList] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
@@ -105,7 +97,6 @@ export default function BatchKhususPage() {
       .catch(() => {})
   }, [])
 
-  // ── Filter produk berdasarkan jenis ──────────────────────────
   const filteredProducts = productList.filter((p) => {
     const kode = p.kode_produk.toUpperCase()
     
@@ -159,7 +150,6 @@ export default function BatchKhususPage() {
           setNoBatch(reportRes.data.no_batch || '')
         }
       } catch {
-        // Tidak ada laporan sebelumnya
       }
 
       await loadHistory(kode)
@@ -193,7 +183,6 @@ export default function BatchKhususPage() {
   const qtyTotal = product?.materials.reduce((s, m) => s + m.qty_per_sachet, 0) ?? 0
   const teoritisTotal = product?.materials.reduce((s, m) => s + m.teoritis, 0) ?? 0
 
-  // ── Hitung Range Batching ──────────────────────────────────
   function computeRangeValues(): { min: number[]; max: number[] } {
     if (!product || d5 <= 0) {
       return { 
@@ -208,7 +197,6 @@ export default function BatchKhususPage() {
 
   const rangeValues = computeRangeValues()
 
-  // ── Load History ─────────────────────────────────────────────
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
     if (!targetKode) return
@@ -232,7 +220,6 @@ export default function BatchKhususPage() {
     }
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
-  // ── Save ──────────────────────────────────────────────────────
   async function handleSave() {
     if (!product) {
       setSaveError('Pilih produk terlebih dahulu.')
@@ -267,7 +254,6 @@ export default function BatchKhususPage() {
     }
   }
 
-  // ── Export PDF ─────────────────────────────────────────────────
   function handleExportPDF() {
     if (!product || d5 <= 0) return
     const createdBy = user?.full_name || user?.username || 'User'
@@ -397,7 +383,6 @@ export default function BatchKhususPage() {
     win.onload = () => { win.print() }
   }
 
-  // ── Styling ───────────────────────────────────────────────────
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -431,7 +416,6 @@ export default function BatchKhususPage() {
 
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <div className="p-2 rounded-lg bg-brand-green/10">
@@ -454,7 +438,6 @@ export default function BatchKhususPage() {
         </p>
       </div>
 
-      {/* Pilih Jenis Produk */}
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
         <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
           Jenis Produk
@@ -477,7 +460,6 @@ export default function BatchKhususPage() {
         </p>
       </div>
 
-      {/* Pilih Kode Produk */}
       {jenisProduk && (
         <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
           <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
@@ -506,7 +488,6 @@ export default function BatchKhususPage() {
         </div>
       )}
 
-      {/* Loading */}
       {loadingProduct && (
         <div className={cn('rounded-xl p-8 text-center shadow-sm', card)}>
           <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-green border-t-transparent mb-2" />
@@ -514,7 +495,6 @@ export default function BatchKhususPage() {
         </div>
       )}
 
-      {/* Tombol Riwayat */}
       {product && !loadingProduct && (
         <div className="mb-4 flex justify-end gap-3">
           <button
@@ -538,7 +518,6 @@ export default function BatchKhususPage() {
         </div>
       )}
 
-      {/* Tabel Perhitungan */}
       {product && !loadingProduct && (
         <>
           <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
@@ -682,7 +661,6 @@ export default function BatchKhususPage() {
             </div>
           </div>
 
-          {/* Form Simpan & Export */}
           <div className={cn('rounded-xl p-5 shadow-sm', card)}>
             <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
               Simpan & Export
@@ -783,7 +761,6 @@ export default function BatchKhususPage() {
         </>
       )}
 
-      {/* History Modal */}
       {showHistory && (
         <HistoryModalBK
           isOpen={showHistory}

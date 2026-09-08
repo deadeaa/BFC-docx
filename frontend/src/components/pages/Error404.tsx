@@ -1,4 +1,3 @@
-// frontend/src/pages/Error404.tsx
 import ErrorPage from '../../components/ErrorPage'
 
 export default function Error404() {

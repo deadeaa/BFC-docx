@@ -1,4 +1,3 @@
-// backend/middleware/error.go
 package middleware
 
 import (

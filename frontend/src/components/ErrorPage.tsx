@@ -1,4 +1,3 @@
-// frontend/src/components/ErrorPage.tsx
 import { Link } from 'react-router-dom'
 import { Home, RefreshCw } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
@@ -28,7 +27,6 @@ export default function ErrorPage({
       isDark ? 'bg-gray-900' : 'bg-brand-bg'
     )}>
       <div className="text-center max-w-lg">
-        {/* Icon / Code */}
         <div className="mb-6">
           <div className={cn(
             'text-8xl font-bold tracking-tight',
@@ -43,7 +41,6 @@ export default function ErrorPage({
           </div>
         </div>
 
-        {/* Title */}
         <h1 className={cn(
           'text-2xl font-bold mb-2',
           isDark ? 'text-white' : 'text-gray-900'
@@ -51,7 +48,6 @@ export default function ErrorPage({
           {title}
         </h1>
 
-        {/* Description */}
         <p className={cn(
           'text-sm mb-4',
           isDark ? 'text-gray-400' : 'text-gray-600'
@@ -59,7 +55,6 @@ export default function ErrorPage({
           {description}
         </p>
 
-        {/* Suggestion */}
         {suggestion && (
           <p className={cn(
             'text-xs mb-6 px-4 py-2 rounded-lg border',
@@ -69,7 +64,6 @@ export default function ErrorPage({
           </p>
         )}
 
-        {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             to="/"
@@ -98,7 +92,6 @@ export default function ErrorPage({
           )}
         </div>
 
-        {/* Footer */}
         <p className={cn(
           'text-xs mt-6',
           isDark ? 'text-gray-600' : 'text-gray-400'

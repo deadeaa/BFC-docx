@@ -22,7 +22,6 @@ func NewUserHandler(db *repository.DB) *UserHandler {
 	return &UserHandler{db: db}
 }
 
-// GET /api/users
 func (h *UserHandler) List(c *gin.Context) {
 	users, err := h.db.ListUsers(c)
 	if err != nil {
@@ -35,7 +34,6 @@ func (h *UserHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-// POST /api/users
 func (h *UserHandler) Create(c *gin.Context) {
 	var req struct {
 		Username string      `json:"username" binding:"required"`
@@ -81,7 +79,6 @@ func (h *UserHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-// PUT /api/users/:id
 func (h *UserHandler) Update(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -129,8 +126,6 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Aktivitas & deskripsi disesuaikan agar sesuai kategori pada Log Aktivitas:
-	// "Mengubah Role User", "Reset Password User", atau "Mengubah User" (umum).
 	changed := []string{}
 	if req.FullName != "" || req.Username != "" {
 		changed = append(changed, "data user")
@@ -167,7 +162,6 @@ func (h *UserHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// DELETE /api/users/:id
 func (h *UserHandler) Delete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -175,7 +169,6 @@ func (h *UserHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Prevent self-delete
 	currentUserID, _ := c.Get(middleware.CtxUserID)
 	if currentUserID.(int) == id {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Tidak bisa menghapus akun sendiri"})

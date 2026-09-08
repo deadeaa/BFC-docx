@@ -1,4 +1,3 @@
-// backend/handlers/report_download_handler.go
 package handlers
 
 import (
@@ -28,7 +27,6 @@ func NewReportDownloadHandler(db *repository.DB) *ReportDownloadHandler {
 	return &ReportDownloadHandler{db: db}
 }
 
-// getKeys returns all keys from a map for debugging
 func getKeys(m map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -37,7 +35,6 @@ func getKeys(m map[string]interface{}) []string {
 	return keys
 }
 
-// getKeysFromMapString returns all keys from map[string]map[string]interface{}
 func getKeysFromMapString(m map[string]map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -46,7 +43,6 @@ func getKeysFromMapString(m map[string]map[string]interface{}) []string {
 	return keys
 }
 
-// formatFloat2 - format angka ke 2 desimal
 func formatFloat2(val interface{}) float64 {
 	if val == nil {
 		return 0
@@ -65,7 +61,6 @@ func formatFloat2(val interface{}) float64 {
 	}
 }
 
-// formatFloat3 - format angka ke 3 desimal
 func formatFloat3(val interface{}) float64 {
 	if val == nil {
 		return 0
@@ -84,7 +79,6 @@ func formatFloat3(val interface{}) float64 {
 	}
 }
 
-// ✅ generateDocxViaNode - baca URL dari .env
 func (h *ReportDownloadHandler) generateDocxViaNode(templatePath string, data map[string]interface{}) ([]byte, error) {
 	fmt.Printf("📄 Generating DOCX from template: %s\n", templatePath)
 	fmt.Printf("📊 Data keys: %v\n", getKeys(data))
@@ -99,7 +93,6 @@ func (h *ReportDownloadHandler) generateDocxViaNode(templatePath string, data ma
 		return nil, fmt.Errorf("marshal payload: %w", err)
 	}
 
-	// ✅ Baca URL dari environment variable
 	docxServiceURL := os.Getenv("DOCX_SERVICE_URL")
 	if docxServiceURL == "" {
 		docxServiceURL = "http://localhost:3001"
@@ -122,7 +115,6 @@ func (h *ReportDownloadHandler) generateDocxViaNode(templatePath string, data ma
 	return io.ReadAll(resp.Body)
 }
 
-// calculateBKValues - hitung nilai material BK secara manual
 func (h *ReportDownloadHandler) calculateBKValues(product *models.BKProduct, inputSisaMinor float64) []float64 {
 	if product == nil || len(product.Materials) == 0 {
 		return []float64{}
@@ -163,9 +155,6 @@ func (h *ReportDownloadHandler) calculateBKValues(product *models.BKProduct, inp
 	return values
 }
 
-// ============================================================
-// PREPARE BK DATA - DENGAN RANGE HASIL PERHITUNGAN
-// ============================================================
 func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string, report *models.BKReport) (map[string]interface{}, error) {
 	fmt.Printf("📦 Preparing BK data for product: %s\n", kodeProduk)
 
@@ -178,9 +167,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 
 	tanggalProduksi := report.TglPembuatan.Format("02-01-2006")
 
-	// ============================================================
-	// DATA UMUM
-	// ============================================================
 	data["no_batch"] = report.NoBatch
 	data["tanggal_produksi"] = tanggalProduksi
 	data["tgl_pembuatan"] = tanggalProduksi
@@ -199,9 +185,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	data["bk_kode_produk"] = product.KodeProduk
 	data["bk_nama_produk"] = product.NamaProduk
 
-	// ============================================================
-	// PARSE DETAIL JSON
-	// ============================================================
 	var detail map[string]interface{}
 	var materialValues []float64
 
@@ -214,7 +197,7 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 						materialValues[i] = val
 					}
 				}
-				fmt.Printf("✅ BK Values from 'values': %v\n", materialValues)
+				fmt.Printf("BK Values from 'values': %v\n", materialValues)
 			} else if vals, ok := detail["material_values"].([]interface{}); ok {
 				materialValues = make([]float64, len(vals))
 				for i, v := range vals {
@@ -222,7 +205,7 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 						materialValues[i] = val
 					}
 				}
-				fmt.Printf("✅ BK Values from 'material_values': %v\n", materialValues)
+				fmt.Printf("BK Values from 'material_values': %v\n", materialValues)
 			} else {
 				if mats, ok := detail["materials"].([]interface{}); ok {
 					materialValues = make([]float64, len(mats))
@@ -237,7 +220,7 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 							}
 						}
 					}
-					fmt.Printf("✅ BK Values from 'materials': %v\n", materialValues)
+					fmt.Printf("BK Values from 'materials': %v\n", materialValues)
 				}
 			}
 		}
@@ -246,14 +229,9 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	if len(materialValues) == 0 {
 		fmt.Printf("⚠️ No values found in detail, calculating manually...\n")
 		materialValues = h.calculateBKValues(product, report.InputSisaMinor)
-		fmt.Printf("✅ Manual values: %v\n", materialValues)
+		fmt.Printf("Manual values: %v\n", materialValues)
 	}
 
-	// ============================================================
-	// DATA MATERIAL - DENGAN RANGE HASIL PERHITUNGAN
-	// Range Min = Material Value - range_min
-	// Range Max = Material Value - range_max
-	// ============================================================
 	materialsData := []map[string]interface{}{}
 	for idx, m := range product.Materials {
 		prefix := fmt.Sprintf("mat_%d_", idx)
@@ -265,8 +243,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 			hasil = 0
 		}
 
-		// ✅ Range Min = Material Value - range_min
-		// ✅ Range Max = Material Value - range_max
 		var rangeMin, rangeMax float64
 		if idx < len(materialValues) {
 			rangeMin = formatFloat2(materialValues[idx] - m.RangeMin)
@@ -305,9 +281,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	}
 	data["materials"] = materialsData
 
-	// ============================================================
-	// DATA RENDEMEN
-	// ============================================================
 	rendemenData := []map[string]interface{}{}
 	for idx, r := range product.Rendemen {
 		persen := formatFloat2(r.Persen * 100)
@@ -329,7 +302,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 	}
 	data["rendemen"] = rendemenData
 
-	// Data rendemen individual untuk akses langsung
 	if len(product.Rendemen) >= 1 {
 		data["bk_rendemen_0_total"] = rendemenData[0]["total"]
 		data["bk_rendemen_0_persentase"] = rendemenData[0]["persentase"]
@@ -351,13 +323,10 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 		data["bk_rendemen_4_persentase"] = rendemenData[4]["persentase"]
 	}
 
-	fmt.Printf("✅ BK Data prepared: %d materials, %d rendemen\n", len(materialsData), len(rendemenData))
+	fmt.Printf("BK Data prepared: %d materials, %d rendemen\n", len(materialsData), len(rendemenData))
 	return data, nil
 }
 
-// ============================================================
-// PREPARE BO DATA
-// ============================================================
 func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string, report *models.BOReport) (map[string]interface{}, error) {
 	fmt.Printf("📦 Preparing BO data for product: %s\n", kodeProduk)
 
@@ -486,7 +455,6 @@ func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string,
 		}
 	}
 
-	// Set data ke placeholder BO
 	if val, ok := materialMap["sodbic"]; ok {
 		data["bo_perbandingan_sodbic"] = formatFloat3(val["perbandingan"])
 		data["bo_ratio_sodbic"] = formatFloat3(val["ratio"])
@@ -586,10 +554,6 @@ func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string,
 	return data, nil
 }
 
-// ============================================================
-// DOWNLOAD BK ONLY - POST /api/reports/download
-// ============================================================
-
 type DownloadReportRequest struct {
 	KodeProduk string `json:"kode_produk" binding:"required"`
 	BKReportID int    `json:"bk_report_id" binding:"required"`
@@ -613,16 +577,14 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 		return
 	}
 
-	// 1. Ambil BK report
 	bkReport, err := h.db.GetBKReportByID(c, req.BKReportID)
 	if err != nil {
 		fmt.Printf("❌ BK Report not found: ID=%d, error=%v\n", req.BKReportID, err)
 		c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
 		return
 	}
-	fmt.Printf("✅ BK Report found: %s\n", bkReport.NoBatch)
+	fmt.Printf("BK Report found: %s\n", bkReport.NoBatch)
 
-	// 2. Ambil template
 	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
 	if err != nil {
 		fmt.Printf("❌ Template not found: %v\n", err)
@@ -632,7 +594,7 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Printf("✅ Template found: %s\n", template.FilePath)
+	fmt.Printf("Template found: %s\n", template.FilePath)
 
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
 		fmt.Printf("❌ File not found: %s\n", template.FilePath)
@@ -643,7 +605,6 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 		return
 	}
 
-	// 3. Siapkan data BK
 	data, err := h.prepareBKData(c, req.KodeProduk, bkReport)
 	if err != nil {
 		fmt.Printf("❌ Prepare BK data error: %v\n", err)
@@ -654,7 +615,6 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 		return
 	}
 
-	// 4. Tambahkan data tambahan
 	data["kode_produk"] = req.KodeProduk
 	data["nama_produk"] = bkReport.NamaProduk
 	data["created_by"] = bkReport.CreatedByName
@@ -662,7 +622,6 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 
 	fmt.Printf("📊 Total data keys: %d\n", len(data))
 
-	// 5. Generate DOCX
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
 		fmt.Printf("❌ Generate DOCX error: %v\n", err)
@@ -673,9 +632,8 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("✅ DOCX generated, size: %d bytes\n", len(docxBytes))
+	fmt.Printf("DOCX generated, size: %d bytes\n", len(docxBytes))
 
-	// 6. Kirim file
 	filename := fmt.Sprintf("report_BK_%s_%s.docx", req.KodeProduk, bkReport.NoBatch)
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+filename)
@@ -689,10 +647,7 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 	})
 }
 
-// ============================================================
 // DOWNLOAD GABUNGAN BO + BK
-// ============================================================
-
 type CombinedReportRequest struct {
 	KodeProduk string `json:"kode_produk" binding:"required"`
 	BOReportID int    `json:"bo_report_id"`
@@ -725,7 +680,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"message": "BO Report tidak ditemukan"})
 			return
 		}
-		fmt.Printf("✅ BO Report found: %s\n", boReport.NoBatch)
+		fmt.Printf("BO Report found: %s\n", boReport.NoBatch)
 	}
 
 	var bkReport *models.BKReport
@@ -736,7 +691,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
 			return
 		}
-		fmt.Printf("✅ BK Report found: %s\n", bkReport.NoBatch)
+		fmt.Printf("BK Report found: %s\n", bkReport.NoBatch)
 	}
 
 	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
@@ -748,7 +703,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Printf("✅ Template found: %s\n", template.FilePath)
+	fmt.Printf("Template found: %s\n", template.FilePath)
 
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
 		fmt.Printf("❌ File not found: %s\n", template.FilePath)
@@ -829,7 +784,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("✅ DOCX generated, size: %d bytes\n", len(docxBytes))
+	fmt.Printf("DOCX generated, size: %d bytes\n", len(docxBytes))
 
 	filename := fmt.Sprintf("report_combined_%s.docx", req.KodeProduk)
 	c.Header("Content-Description", "File Transfer")
@@ -844,10 +799,7 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 	})
 }
 
-// ============================================================
 // DOWNLOAD INDIVIDUAL (BO atau BK)
-// ============================================================
-
 func (h *ReportDownloadHandler) DownloadReport(c *gin.Context) {
 	reportID, err := strconv.Atoi(c.Param("reportId"))
 	if err != nil {

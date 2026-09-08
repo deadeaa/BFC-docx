@@ -1,4 +1,3 @@
-// frontend/src/router/AppRouter.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '../context/AuthContext'
 import { ThemeProvider } from '../context/ThemeContext'
@@ -42,7 +41,6 @@ export default function AppRouter() {
               <Route path="/503" element={<Error503 />} />
               <Route path="*" element={<Error404 />} />
 
-            {/* Protected routes */}
             <Route
               path="/welcome"
               element={
@@ -57,7 +55,7 @@ export default function AppRouter() {
             <Route
               path="/admin/batch-khusus"
               element={
-                <RequireAuth roles={['admin']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <AdminBatchKhususPage />
                   </Layout>
@@ -67,7 +65,7 @@ export default function AppRouter() {
             <Route
               path="/admin/batch-overfilled"
               element={
-                <RequireAuth roles={['admin']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <AdminBatchOverfilledPage />
                   </Layout>
@@ -75,11 +73,10 @@ export default function AppRouter() {
               }
             />
             
-            {/* Perhitungan – admin + produksi + qa */}
             <Route
               path="/perhitungan/batch-overfilled"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa']}>
+                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
                   <Layout>
                     <BatchOverfilledPage />
                   </Layout>
@@ -89,7 +86,7 @@ export default function AppRouter() {
             <Route
               path="/perhitungan/batch-khusus"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa']}>
+                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
                   <Layout>
                     <BatchKhususPage />
                   </Layout>
@@ -97,11 +94,10 @@ export default function AppRouter() {
               }
             />
 
-            {/* Report – all roles */}
             <Route
               path="/report/batch-overfilled"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa']}>
+                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
                   <Layout>
                     <ReportBatchOverfilledPage />
                   </Layout>
@@ -111,7 +107,7 @@ export default function AppRouter() {
             <Route
               path="/report/batch-khusus"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa']}>
+                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
                   <Layout>
                     <ReportBatchKhususPage />
                   </Layout>
@@ -119,11 +115,10 @@ export default function AppRouter() {
               }
             />
 
-            // Admin only
             <Route
               path="/admin/report-templates"
               element={
-                <RequireAuth roles={['admin']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <AdminReportTemplatePage />
                   </Layout>
@@ -131,22 +126,20 @@ export default function AppRouter() {
               }
             />
 
-            // All roles (user bisa download)
             <Route
               path="/download-report"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa']}>
+                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
                   <Layout>
                     <DownloadReportPage />
                   </Layout>
                 </RequireAuth>
               }
             />
-            {/* Admin-only */}
             <Route
               path="/users"
               element={
-                <RequireAuth roles={['admin']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <UsersPage />
                   </Layout>
@@ -156,7 +149,7 @@ export default function AppRouter() {
             <Route
               path="/log-aktivitas"
               element={
-                <RequireAuth roles={['admin']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <LogAktivitasPage />
                   </Layout>
@@ -164,7 +157,6 @@ export default function AppRouter() {
               }
             />
 
-            {/* Unauthorized */}
             <Route
               path="/unauthorized"
               element={
@@ -176,7 +168,6 @@ export default function AppRouter() {
               }
             />
 
-            {/* Fallback */}
             <Route path="*" element={<Navigate to="/welcome" replace />} />
           </Routes>
         </AuthProvider>

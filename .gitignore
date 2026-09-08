@@ -11,4 +11,6 @@ docker-compose.override.yml
 
 # Uploads (keep folder structure)
 uploads/
-!uploads/.gitkeep
+!uploads/.gitkeepnode_modules/
+.DS_Store
+**/.DS_Store

@@ -1,4 +1,3 @@
-// frontend/src/components/pages/SignUpPage.tsx
 import { useState, type FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, UserPlus, CheckCircle2 } from 'lucide-react'
@@ -216,7 +215,6 @@ export default function SignUpPage() {
       `}</style>
 
       <div className="bfc-login-root">
-        {/* LEFT - Hero Section */}
         <div className="bfc-login-left bfc-hero">
           <svg
             aria-hidden
@@ -275,7 +273,6 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        {/* RIGHT - Form Sign Up */}
         <div className="bfc-login-right">
           <div className="bfc-form bfc-form-card" style={{ width: '100%', maxWidth: '380px' }}>
             {success ? (
@@ -312,7 +309,6 @@ export default function SignUpPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  {/* Nama */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',
@@ -336,7 +332,6 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Username */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',
@@ -360,7 +355,6 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Password */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',
@@ -398,7 +392,6 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Konfirmasi Password */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',
@@ -436,7 +429,6 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Role - Hanya menampilkan role yang diizinkan untuk signup */}
                   <div>
                     <label style={{
                       display: 'block', marginBottom: '8px',

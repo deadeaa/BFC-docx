@@ -75,7 +75,6 @@ export default function WelcomePage() {
         .dot { animation: blink 2.4s ease-in-out infinite; }
       `}</style>
 
-      {/* ── Root ──────────────────────────────────────────────── */}
       <div className="pg" style={{
         minHeight: '100%',
         position: 'relative',
@@ -87,7 +86,6 @@ export default function WelcomePage() {
         background: bg,
       }}>
 
-        {/* Subtle grain */}
         <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:0, opacity: isDark ? 0.5 : 0.35 }}>
           <filter id="gr">
             <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
@@ -96,7 +94,6 @@ export default function WelcomePage() {
           <rect width="100%" height="100%" filter="url(#gr)" opacity="0.04"/>
         </svg>
 
-        {/* Soft center light */}
         <div style={{
           position:'absolute', inset:0, zIndex:1, pointerEvents:'none',
           background: isDark
@@ -104,7 +101,6 @@ export default function WelcomePage() {
             : 'radial-gradient(ellipse 50% 45% at 50% 45%, rgba(255,255,255,0.65) 0%, transparent 100%)',
         }}/>
 
-        {/* ── Floating products — LEFT EDGE ONLY ───────────────── */}
         {PRODUCTS.map((p, i) => (
           <div key={i} style={{
             position: 'absolute',
@@ -126,7 +122,6 @@ export default function WelcomePage() {
           </div>
         ))}
 
-        {/* ── HERO CENTER — z:20, narrow, purely text flow ──────── */}
         <div style={{
           position: 'relative',
           zIndex: 20,
@@ -137,11 +132,9 @@ export default function WelcomePage() {
           width: '100%',
           maxWidth: '440px',
           padding: '0 20px',
-          /* Push content slightly above center */
           marginTop: '-40px',
         }}>
 
-          {/* Date + Online badge */}
           <div className="u1" style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             flexWrap: 'wrap', justifyContent: 'center',
@@ -164,7 +157,6 @@ export default function WelcomePage() {
             </span>
           </div>
 
-          {/* Eyebrow */}
           <p className="u2" style={{
             fontSize:'11px', fontWeight:700, letterSpacing:'0.18em',
             textTransform:'uppercase',
@@ -174,7 +166,6 @@ export default function WelcomePage() {
             {greeting}
           </p>
 
-          {/* "Selamat datang," */}
           <p className="u3" style={{
             fontSize:'2rem', fontWeight:700, lineHeight:1.25,
             letterSpacing:'-0.018em',
@@ -184,7 +175,6 @@ export default function WelcomePage() {
             Selamat datang,
           </p>
 
-          {/* Name — same size, green */}
           <p className="u3" style={{
             fontSize:'2rem', fontWeight:800, lineHeight:1.25,
             letterSpacing:'-0.018em',
@@ -195,7 +185,6 @@ export default function WelcomePage() {
             {name}
           </p>
 
-          {/* Divider */}
           <div className="u4" style={{
             width:'28px', height:'1.5px', borderRadius:'2px',
             background: isDark
@@ -204,7 +193,6 @@ export default function WelcomePage() {
             marginBottom:'18px', opacity:0.5,
           }}/>
 
-          {/* Body */}
           <p className="u4" style={{
             fontSize:'14px', fontWeight:400, lineHeight:1.85,
             color: isDark ? '#5a7860' : '#3d5c42',

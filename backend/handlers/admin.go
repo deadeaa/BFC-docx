@@ -19,11 +19,8 @@ func NewAdminHandler(db *repository.DB) *AdminHandler {
 	return &AdminHandler{db: db}
 }
 
-// ──────────────── BATCH KHUSUS (BK) ────────────────
 
-// GET /api/admin/bk/products
 func (h *AdminHandler) ListBKProducts(c *gin.Context) {
-	// ✅ Gunakan ListBKProductsFull (bukan ListBKProducts)
 	products, err := h.db.ListBKProductsFull(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengambil data produk: " + err.Error()})
@@ -32,7 +29,6 @@ func (h *AdminHandler) ListBKProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
-// GET /api/admin/bk/products/:id
 func (h *AdminHandler) GetBKProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -40,7 +36,6 @@ func (h *AdminHandler) GetBKProduct(c *gin.Context) {
 		return
 	}
 
-	// ✅ Gunakan GetBKProductByID
 	product, err := h.db.GetBKProductByID(c, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Produk tidak ditemukan"})
@@ -49,7 +44,6 @@ func (h *AdminHandler) GetBKProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// POST /api/admin/bk/products
 func (h *AdminHandler) CreateBKProduct(c *gin.Context) {
 	var req models.BKProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -72,7 +66,6 @@ func (h *AdminHandler) CreateBKProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
-// PUT /api/admin/bk/products/:id
 func (h *AdminHandler) UpdateBKProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -101,7 +94,6 @@ func (h *AdminHandler) UpdateBKProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// DELETE /api/admin/bk/products/:id
 func (h *AdminHandler) DeleteBKProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -123,11 +115,8 @@ func (h *AdminHandler) DeleteBKProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Produk berhasil dihapus"})
 }
 
-// ──────────────── BATCH OVERFILLED (BO) ────────────────
-
-// GET /api/admin/bo/products
 func (h *AdminHandler) ListBOProducts(c *gin.Context) {
-	products, err := h.db.ListBOProductsFull(c) // ✅ Gunakan method baru
+	products, err := h.db.ListBOProductsFull(c) 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengambil data produk: " + err.Error()})
 		return
@@ -135,7 +124,6 @@ func (h *AdminHandler) ListBOProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
-// GET /api/admin/bo/products/:id
 func (h *AdminHandler) GetBOProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -151,7 +139,6 @@ func (h *AdminHandler) GetBOProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// POST /api/admin/bo/products
 func (h *AdminHandler) CreateBOProduct(c *gin.Context) {
 	var req models.BOProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -174,7 +161,6 @@ func (h *AdminHandler) CreateBOProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
-// PUT /api/admin/bo/products/:id
 func (h *AdminHandler) UpdateBOProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -203,7 +189,6 @@ func (h *AdminHandler) UpdateBOProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
-// DELETE /api/admin/bo/products/:id
 func (h *AdminHandler) DeleteBOProduct(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

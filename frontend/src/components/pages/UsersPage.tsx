@@ -1,4 +1,3 @@
-// frontend/src/components/pages/UsersPage.tsx
 import { useState, useEffect, type FormEvent } from 'react'
 import { Plus, Pencil, Trash2, X, Check, Search, UserCircle2 } from 'lucide-react'
 import api from '../../lib/api'
@@ -7,7 +6,6 @@ import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 import { roleLabel } from '../../lib/roles'
 
-// Semua role yang tersedia di sistem
 const ROLES: Role[] = ['admin', 'ts', 'ppic', 'produksi', 'qa']
 
 interface UserForm {
@@ -46,7 +44,6 @@ export default function UsersPage() {
       const { data } = await api.get<User[]>('/users')
       setUsers(data)
     } catch {
-      // ignore
     } finally {
       setLoading(false)
     }
@@ -107,7 +104,6 @@ export default function UsersPage() {
       setDeleteId(null)
       fetchUsers()
     } catch {
-      // ignore
     }
   }
 
@@ -142,7 +138,6 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1
@@ -179,7 +174,6 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className={`rounded-2xl border overflow-hidden ${cardBg}`}>
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -269,7 +263,6 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div
@@ -396,7 +389,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div

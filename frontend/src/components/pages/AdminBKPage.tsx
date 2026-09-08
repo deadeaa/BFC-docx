@@ -1,4 +1,3 @@
-// frontend/src/components/pages/admin/AdminBatchKhususPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Pencil, Trash2, X, Save, AlertCircle, CheckCircle2 } from 'lucide-react'
 import api from '../../lib/api'
@@ -52,8 +51,6 @@ const emptyProduct = (): AdminBKProduct => ({
   rendemen: [],
 })
 
-// ── Helper untuk generate default material name ──────────────
-
 function getDefaultMaterialName(index: number, kodeProduk: string): string {
   switch (index) {
     case 0:
@@ -86,7 +83,6 @@ export default function AdminBatchKhususPage() {
   const [success, setSuccess] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
-  // Display values
   const [displayValues, setDisplayValues] = useState<{
     materials: { qty_per_sachet: string; teoritis: string; range_min: string; range_max: string }[]
     rendemen: { persen: string }[]
@@ -95,7 +91,6 @@ export default function AdminBatchKhususPage() {
     rendemen: []
   })
 
-  // Sync display values
   useEffect(() => {
     setDisplayValues({
       materials: formData.materials.map(m => ({
@@ -145,7 +140,6 @@ export default function AdminBatchKhususPage() {
     setIsModalOpen(true)
   }
 
-  // Auto-generate rendemen berdasarkan jumlah material (default 0)
   const generateRendemen = (materialsCount: number): AdminBKRendemen[] => {
     if (materialsCount < 1) return []
     
@@ -158,8 +152,6 @@ export default function AdminBatchKhususPage() {
     }
     return rendemen
   }
-
-  // ── Material Handlers ──────────────────────────────────────
 
   const addMaterial = () => {
     const lastIndex = formData.materials.length
@@ -184,7 +176,6 @@ export default function AdminBatchKhususPage() {
     const upperKode = newKode.toUpperCase()
     setFormData({ ...formData, kode_produk: upperKode })
     
-    // Update material index 1 jika ada
     const materialIndex1 = formData.materials.findIndex(m => m.material_index === 1)
     if (materialIndex1 !== -1) {
       const currentMaterial = formData.materials[materialIndex1]
@@ -267,8 +258,6 @@ export default function AdminBatchKhususPage() {
     newMaterials[index] = { ...newMaterials[index], [field]: value }
     setFormData({ ...formData, materials: newMaterials })
   }
-
-  // ── Rendemen Handlers ──────────────────────────────────────
 
   const addRendemen = () => {
     const lastOrder = formData.rendemen.length
@@ -366,8 +355,6 @@ export default function AdminBatchKhususPage() {
     }
   }
 
-  // ── Styling ───────────────────────────────────────────────────
-
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
   const inputBase = cn(
     'w-full px-3 py-2 rounded-lg border text-sm transition-colors outline-none',
@@ -378,7 +365,6 @@ export default function AdminBatchKhususPage() {
 
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className={cn('text-xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>
@@ -397,7 +383,6 @@ export default function AdminBatchKhususPage() {
         </button>
       </div>
 
-      {/* Success/Error */}
       {success && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 mb-4">
           <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
@@ -411,7 +396,6 @@ export default function AdminBatchKhususPage() {
         </div>
       )}
 
-      {/* Product List */}
       <div className={cn('rounded-xl shadow-sm overflow-hidden', card)}>
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -477,7 +461,6 @@ export default function AdminBatchKhususPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={cn('w-full max-w-5xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden', card)}>
@@ -491,7 +474,6 @@ export default function AdminBatchKhususPage() {
             </div>
 
             <div className="overflow-y-auto p-4 space-y-4" style={{ maxHeight: 'calc(90vh - 80px)' }}>
-              {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -523,7 +505,6 @@ export default function AdminBatchKhususPage() {
                 </div>
               </div>
 
-              {/* Materials */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
@@ -632,7 +613,6 @@ export default function AdminBatchKhususPage() {
                 </div>
               </div>
 
-              {/* Rendemen */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
@@ -730,7 +710,6 @@ export default function AdminBatchKhususPage() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
       {deleteTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={cn('w-full max-w-sm rounded-xl shadow-2xl p-6', card)}>

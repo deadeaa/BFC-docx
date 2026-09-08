@@ -1,4 +1,3 @@
-// backend/repository/admin_repository.go
 package repository
 
 import (
@@ -7,9 +6,6 @@ import (
 	"bfc-backend/models"
 )
 
-// ──────────────── ADMIN BATCH KHUSUS ────────────────
-
-// CreateBKProductWithConfig - Create product with materials and rendemen
 func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBKProductRequest) (*models.AdminBKProductResponse, error) {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
@@ -17,7 +13,6 @@ func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBK
 	}
 	defer tx.Rollback(ctx)
 
-	// Insert product
 	var productID int
 	err = tx.QueryRow(ctx,
 		`INSERT INTO bk_products (kode_produk, nama_produk) VALUES ($1, $2) RETURNING id`,
@@ -27,7 +22,6 @@ func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBK
 		return nil, err
 	}
 
-	// Insert materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
@@ -39,7 +33,6 @@ func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBK
 		}
 	}
 
-	// Insert rendemen
 	for _, r := range req.Rendemen {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_rendemen (product_id, sort_order, persen) VALUES ($1, $2, $3)`,
@@ -57,7 +50,6 @@ func (db *DB) CreateBKProductWithConfig(ctx context.Context, req *models.AdminBK
 	return db.GetBKProductConfigByID(ctx, productID)
 }
 
-// UpdateBKProductWithConfig - Update product with materials and rendemen
 func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models.AdminBKProductRequest) (*models.AdminBKProductResponse, error) {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
@@ -65,7 +57,6 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 	}
 	defer tx.Rollback(ctx)
 
-	// Update product
 	_, err = tx.Exec(ctx,
 		`UPDATE bk_products SET kode_produk = $1, nama_produk = $2, updated_at = NOW() WHERE id = $3`,
 		req.KodeProduk, req.NamaProduk, id,
@@ -74,7 +65,6 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 		return nil, err
 	}
 
-	// Delete existing materials and rendemen
 	_, err = tx.Exec(ctx, `DELETE FROM bk_product_materials WHERE product_id = $1`, id)
 	if err != nil {
 		return nil, err
@@ -84,7 +74,6 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 		return nil, err
 	}
 
-	// Insert new materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
@@ -96,7 +85,6 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 		}
 	}
 
-	// Insert new rendemen
 	for _, r := range req.Rendemen {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_rendemen (product_id, sort_order, persen) VALUES ($1, $2, $3)`,
@@ -114,7 +102,6 @@ func (db *DB) UpdateBKProductWithConfig(ctx context.Context, id int, req *models
 	return db.GetBKProductConfigByID(ctx, id)
 }
 
-// GetBKProductConfigByID - Get product with materials and rendemen
 func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.AdminBKProductResponse, error) {
 	resp := &models.AdminBKProductResponse{}
 
@@ -126,7 +113,6 @@ func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.Admin
 		return nil, err
 	}
 
-	// Get materials - ✅ tambahkan teoritis
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`,
@@ -146,7 +132,6 @@ func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.Admin
 		resp.Materials = append(resp.Materials, m)
 	}
 
-	// Get rendemen
 	rows2, err := db.pool.Query(ctx,
 		`SELECT id, product_id, sort_order, persen FROM bk_product_rendemen WHERE product_id = $1 ORDER BY sort_order`,
 		id,
@@ -167,7 +152,6 @@ func (db *DB) GetBKProductConfigByID(ctx context.Context, id int) (*models.Admin
 	return resp, nil
 }
 
-// ListBKProductsConfig - List all BK products with config
 func (db *DB) ListBKProductsConfig(ctx context.Context) ([]models.AdminBKProductResponse, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, kode_produk, nama_produk, created_at, updated_at FROM bk_products ORDER BY kode_produk`,
@@ -188,7 +172,6 @@ func (db *DB) ListBKProductsConfig(ctx context.Context) ([]models.AdminBKProduct
 	return products, nil
 }
 
-// DeleteBKProductWithConfig - Delete product and all related data
 func (db *DB) DeleteBKProductWithConfig(ctx context.Context, id int) error {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
@@ -204,9 +187,6 @@ func (db *DB) DeleteBKProductWithConfig(ctx context.Context, id int) error {
 	return tx.Commit(ctx)
 }
 
-// ──────────────── ADMIN BATCH OVERFILLED ────────────────
-
-// CreateBOProductWithConfig - Create product with materials and thresholds
 func (db *DB) CreateBOProductWithConfig(ctx context.Context, req *models.AdminBOProductRequest) (*models.AdminBOProductResponse, error) {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
@@ -252,7 +232,6 @@ func (db *DB) CreateBOProductWithConfig(ctx context.Context, req *models.AdminBO
 	return db.GetBOProductConfigByID(ctx, productID)
 }
 
-// GetBOProductConfigByID - Get product with materials and thresholds
 func (db *DB) GetBOProductConfigByID(ctx context.Context, id int) (*models.AdminBOProductResponse, error) {
 	resp := &models.AdminBOProductResponse{}
 
@@ -305,7 +284,6 @@ func (db *DB) GetBOProductConfigByID(ctx context.Context, id int) (*models.Admin
 	return resp, nil
 }
 
-// UpdateBOProductWithConfig - Update product with materials and thresholds
 func (db *DB) UpdateBOProductWithConfig(ctx context.Context, id int, req *models.AdminBOProductRequest) (*models.AdminBOProductResponse, error) {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
@@ -359,7 +337,6 @@ func (db *DB) UpdateBOProductWithConfig(ctx context.Context, id int, req *models
 	return db.GetBOProductConfigByID(ctx, id)
 }
 
-// ListBOProductsConfig - List all BO products with config
 func (db *DB) ListBOProductsConfig(ctx context.Context) ([]models.AdminBOProductResponse, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, kode_produk, nama_produk, created_at, updated_at FROM bo_products ORDER BY kode_produk`,
@@ -380,7 +357,6 @@ func (db *DB) ListBOProductsConfig(ctx context.Context) ([]models.AdminBOProduct
 	return products, nil
 }
 
-// DeleteBOProductWithConfig - Delete product and all related data
 func (db *DB) DeleteBOProductWithConfig(ctx context.Context, id int) error {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {

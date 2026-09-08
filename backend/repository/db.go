@@ -1,4 +1,3 @@
-// backend/repository/repository.go
 package repository
 
 import (
@@ -28,8 +27,6 @@ func New(connStr string) (*DB, error) {
 	}
 	return &DB{pool: pool}, nil
 }
-
-// ──────────────── USER ────────────────
 
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	u := &models.User{}
@@ -121,8 +118,6 @@ func (db *DB) DeleteUser(ctx context.Context, id int) error {
 	return err
 }
 
-// ──────────────── SESSION ────────────────
-
 func (db *DB) CreateSession(ctx context.Context, s *models.Session) error {
 	_, err := db.pool.Exec(ctx,
 		`INSERT INTO sessions (user_id, refresh_token, last_activity, expires_at)
@@ -158,8 +153,6 @@ func (db *DB) DeleteUserSessions(ctx context.Context, userID int) error {
 	_, err := db.pool.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
 	return err
 }
-
-// ──────────────── ACTIVITY LOG ────────────────
 
 func (db *DB) CreateActivityLog(ctx context.Context, log *models.ActivityLog) error {
 	_, err := db.pool.Exec(ctx,
@@ -282,8 +275,6 @@ func (db *DB) GetActivityLogByID(ctx context.Context, id int) (*models.ActivityL
 	return l, nil
 }
 
-// ──────────────── MIGRATE ────────────────
-
 func (db *DB) Migrate(ctx context.Context) error {
 	_, err := db.pool.Exec(ctx, schema)
 	return err
@@ -297,7 +288,7 @@ CREATE TABLE IF NOT EXISTS users (
 	username   VARCHAR(100) UNIQUE NOT NULL,
 	full_name  VARCHAR(200) NOT NULL,
 	password   VARCHAR(255) NOT NULL,
-	role       VARCHAR(50)  NOT NULL CHECK (role IN ('admin','produksi','qa')),
+	role       VARCHAR(50)  NOT NULL CHECK (role IN ('admin','produksi','qa', 'ts', 'ppic')),
 	is_active  BOOLEAN      NOT NULL DEFAULT true,
 	created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 	updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -373,7 +364,6 @@ CREATE TABLE IF NOT EXISTS bk_products (
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- ✅ TAMBAHKAN KOLOM TEORITIS
 ALTER TABLE bk_product_materials ADD COLUMN IF NOT EXISTS teoritis NUMERIC(12,4) DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS bk_product_materials (
@@ -460,8 +450,6 @@ CREATE INDEX IF NOT EXISTS idx_bo_thresholds_pid   ON bo_product_thresholds(prod
 
 var ErrNoRows = pgx.ErrNoRows
 
-// ──────────────── BATCH KHUSUS ────────────────
-
 func (db *DB) ListBKProducts(ctx context.Context) ([]models.BKProduct, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, kode_produk, nama_produk FROM bk_products ORDER BY kode_produk`)
@@ -480,9 +468,6 @@ func (db *DB) ListBKProducts(ctx context.Context) ([]models.BKProduct, error) {
 	return products, nil
 }
 
-// ──────────────── BATCH KHUSUS ADMIN ────────────────
-
-// ListBKProductsFull - Ambil semua produk BK dengan materials dan rendemen lengkap
 func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error) {
 	log.Printf("🔍 ListBKProductsFull: fetching all BK products with materials and rendemen")
 
@@ -515,7 +500,6 @@ func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error
 	for i, p := range products {
 		log.Printf("📦 Fetching details for product: %s (ID: %d)", p.KodeProduk, p.ID)
 
-		// Ambil materials - ✅ tambahkan teoritis
 		mRows, err := db.pool.Query(ctx,
 			`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 			 FROM bk_product_materials 
@@ -540,7 +524,6 @@ func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error
 		products[i].Materials = materials
 		log.Printf("📦 Product %s has %d materials", p.KodeProduk, len(materials))
 
-		// Ambil rendemen
 		rRows, err := db.pool.Query(ctx,
 			`SELECT id, product_id, sort_order, persen
 			 FROM bk_product_rendemen 
@@ -565,11 +548,10 @@ func (db *DB) ListBKProductsFull(ctx context.Context) ([]models.BKProduct, error
 		log.Printf("📦 Product %s has %d rendemen", p.KodeProduk, len(rendemen))
 	}
 
-	log.Printf("✅ ListBKProductsFull completed: %d products loaded", len(products))
+	log.Printf("ListBKProductsFull completed: %d products loaded", len(products))
 	return products, nil
 }
 
-// GetBKProductByID - Ambil satu produk BK dengan materials dan rendemen lengkap
 func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, error) {
 	log.Printf("🔍 GetBKProductByID: id=%d", id)
 
@@ -589,7 +571,6 @@ func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, 
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 
-	// Ambil materials - ✅ tambahkan teoritis
 	mRows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`, p.ID)
@@ -610,7 +591,6 @@ func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, 
 	}
 	log.Printf("📦 Product %s has %d materials", p.KodeProduk, len(p.Materials))
 
-	// Ambil rendemen
 	rRows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, sort_order, persen
 		 FROM bk_product_rendemen WHERE product_id = $1 ORDER BY sort_order`, p.ID)
@@ -633,7 +613,6 @@ func (db *DB) GetBKProductByID(ctx context.Context, id int) (*models.BKProduct, 
 	return p, nil
 }
 
-// GetBKProductFullByKode - Ambil produk BK dengan materials dan rendemen lengkap berdasarkan kode
 func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*models.BKProduct, error) {
 	log.Printf("🔍 GetBKProductFullByKode: kode=%s", kodeProduk)
 
@@ -654,7 +633,6 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 
-	// Ambil materials - ✅ tambahkan teoritis
 	mRows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max
 		 FROM bk_product_materials WHERE product_id = $1 ORDER BY material_index`, p.ID)
@@ -675,7 +653,6 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	}
 	log.Printf("📦 Product %s has %d materials", p.KodeProduk, len(p.Materials))
 
-	// Ambil rendemen
 	rRows, err := db.pool.Query(ctx,
 		`SELECT id, product_id, sort_order, persen
 		 FROM bk_product_rendemen WHERE product_id = $1 ORDER BY sort_order`, p.ID)
@@ -698,7 +675,6 @@ func (db *DB) GetBKProductFullByKode(ctx context.Context, kodeProduk string) (*m
 	return &p, nil
 }
 
-// CreateBKProduct - Buat produk BK baru - ✅ tambahkan teoritis
 func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest) (*models.BKProduct, error) {
 	log.Printf("🔍 CreateBKProduct: kode=%s", req.KodeProduk)
 
@@ -717,7 +693,6 @@ func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest)
 		return nil, fmt.Errorf("insert product failed: %w", err)
 	}
 
-	// ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
@@ -742,11 +717,10 @@ func (db *DB) CreateBKProduct(ctx context.Context, req *models.BKProductRequest)
 		return nil, err
 	}
 
-	log.Printf("✅ Product created with ID: %d", productID)
+	log.Printf("Product created with ID: %d", productID)
 	return db.GetBKProductByID(ctx, productID)
 }
 
-// UpdateBKProduct - Update produk BK yang sudah ada - ✅ tambahkan teoritis
 func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProductRequest) (*models.BKProduct, error) {
 	log.Printf("🔍 UpdateBKProduct: id=%d, kode=%s", id, req.KodeProduk)
 
@@ -773,7 +747,6 @@ func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProduct
 		return nil, fmt.Errorf("update product failed: %w", err)
 	}
 
-	// Delete old materials and rendemen
 	_, err = tx.Exec(ctx, `DELETE FROM bk_product_materials WHERE product_id = $1`, id)
 	if err != nil {
 		return nil, fmt.Errorf("delete old materials failed: %w", err)
@@ -783,7 +756,6 @@ func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProduct
 		return nil, fmt.Errorf("delete old rendemen failed: %w", err)
 	}
 
-	// Insert new materials - ✅ tambahkan teoritis
 	for _, m := range req.Materials {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_materials (product_id, material_index, kode_material, qty_per_sachet, teoritis, range_min, range_max)
@@ -794,7 +766,6 @@ func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProduct
 		}
 	}
 
-	// Insert new rendemen
 	for _, r := range req.Rendemen {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO bk_product_rendemen (product_id, sort_order, persen)
@@ -809,11 +780,10 @@ func (db *DB) UpdateBKProduct(ctx context.Context, id int, req *models.BKProduct
 		return nil, err
 	}
 
-	log.Printf("✅ Product updated with ID: %d", id)
+	log.Printf("Product updated with ID: %d", id)
 	return db.GetBKProductByID(ctx, id)
 }
 
-// DeleteBKProduct - Hapus produk BK
 func (db *DB) DeleteBKProduct(ctx context.Context, id int) error {
 	log.Printf("🔍 DeleteBKProduct: id=%d", id)
 
@@ -832,13 +802,10 @@ func (db *DB) DeleteBKProduct(ctx context.Context, id int) error {
 		return fmt.Errorf("delete product failed: %w", err)
 	}
 
-	log.Printf("✅ Product deleted: ID=%d", id)
+	log.Printf("roduct deleted: ID=%d", id)
 	return nil
 }
 
-// ──────────────── LIST BO PRODUCTS ────────────────
-
-// ListBOProducts - Ambil daftar produk BO (tanpa materials dan thresholds)
 func (db *DB) ListBOProducts(ctx context.Context) ([]models.BOProduct, error) {
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, kode_produk, nama_produk FROM bo_products ORDER BY kode_produk`)
@@ -988,8 +955,6 @@ func (db *DB) DeleteBKReport(ctx context.Context, id int) error {
 	return err
 }
 
-// ──────────────── BATCH OVERFILLED ────────────────
-
 func (db *DB) GetBOProduct(ctx context.Context, kodeProduk string) (*models.BOProduct, error) {
 	p := &models.BOProduct{
 		Materials:  []models.BOMaterial{},
@@ -1036,9 +1001,6 @@ func (db *DB) GetBOProduct(ctx context.Context, kodeProduk string) (*models.BOPr
 	return p, nil
 }
 
-// ──────────────── BATCH OVERFILLED ADMIN ────────────────
-
-// ListBOProductsFull - Ambil semua produk BO dengan materials dan thresholds lengkap
 func (db *DB) ListBOProductsFull(ctx context.Context) ([]models.BOProduct, error) {
 	log.Printf("🔍 ListBOProductsFull: fetching all BO products with materials and thresholds")
 
@@ -1120,11 +1082,10 @@ func (db *DB) ListBOProductsFull(ctx context.Context) ([]models.BOProduct, error
 		log.Printf("📦 Product %s has %d thresholds", p.KodeProduk, len(thresholds))
 	}
 
-	log.Printf("✅ ListBOProductsFull completed: %d products loaded", len(products))
+	log.Printf("ListBOProductsFull completed: %d products loaded", len(products))
 	return products, nil
 }
 
-// GetBOProductByID - Ambil satu produk BO dengan materials dan thresholds lengkap
 func (db *DB) GetBOProductByID(ctx context.Context, id int) (*models.BOProduct, error) {
 	log.Printf("🔍 GetBOProductByID: id=%d", id)
 
@@ -1187,7 +1148,6 @@ func (db *DB) GetBOProductByID(ctx context.Context, id int) (*models.BOProduct, 
 	return p, nil
 }
 
-// CreateBOProduct - Buat produk BO baru
 func (db *DB) CreateBOProduct(ctx context.Context, req *models.BOProductRequest) (*models.BOProduct, error) {
 	log.Printf("🔍 CreateBOProduct: kode=%s", req.KodeProduk)
 
@@ -1230,11 +1190,10 @@ func (db *DB) CreateBOProduct(ctx context.Context, req *models.BOProductRequest)
 		return nil, err
 	}
 
-	log.Printf("✅ Product created with ID: %d", productID)
+	log.Printf("roduct created with ID: %d", productID)
 	return db.GetBOProductByID(ctx, productID)
 }
 
-// UpdateBOProduct - Update produk BO yang sudah ada
 func (db *DB) UpdateBOProduct(ctx context.Context, id int, req *models.BOProductRequest) (*models.BOProduct, error) {
 	log.Printf("🔍 UpdateBOProduct: id=%d, kode=%s", id, req.KodeProduk)
 
@@ -1294,11 +1253,10 @@ func (db *DB) UpdateBOProduct(ctx context.Context, id int, req *models.BOProduct
 		return nil, err
 	}
 
-	log.Printf("✅ Product updated with ID: %d", id)
+	log.Printf("Product updated with ID: %d", id)
 	return db.GetBOProductByID(ctx, id)
 }
 
-// DeleteBOProduct - Hapus produk BO
 func (db *DB) DeleteBOProduct(ctx context.Context, id int) error {
 	log.Printf("🔍 DeleteBOProduct: id=%d", id)
 
@@ -1317,11 +1275,9 @@ func (db *DB) DeleteBOProduct(ctx context.Context, id int) error {
 		return fmt.Errorf("delete product failed: %w", err)
 	}
 
-	log.Printf("✅ Product deleted: ID=%d", id)
+	log.Printf("Product deleted: ID=%d", id)
 	return nil
 }
-
-// ──────────────── BO REPORTS ────────────────
 
 func (db *DB) CreateBOReport(ctx context.Context, r *models.BOReport) (*models.BOReport, error) {
 	log.Printf("🔍 CreateBOReport: kode=%s, noBatch=%s", r.KodeProduk, r.NoBatch)
@@ -1356,7 +1312,7 @@ func (db *DB) CreateBOReport(ctx context.Context, r *models.BOReport) (*models.B
 		r.NamaProduk = namaProduk
 	}
 
-	log.Printf("✅ Report created: ID=%d", r.ID)
+	log.Printf("Report created: ID=%d", r.ID)
 	return r, nil
 }
 
@@ -1442,8 +1398,6 @@ func (db *DB) DeleteBOReport(ctx context.Context, id int) error {
 	return err
 }
 
-// ──────────────── GET LATEST BO REPORT ────────────────
-
 func (db *DB) GetLatestBOReportByProduct(ctx context.Context, kodeProduk string) (*models.BOReport, error) {
 	log.Printf("🔍 GetLatestBOReportByProduct: kode=%s", kodeProduk)
 
@@ -1478,7 +1432,7 @@ func (db *DB) GetLatestBOReportByProduct(ctx context.Context, kodeProduk string)
 		log.Printf("❌ Query error: %v", err)
 		return nil, err
 	}
-	log.Printf("✅ Found report: ID=%d, NoBatch=%s", rep.ID, rep.NoBatch)
+	log.Printf("Found report: ID=%d, NoBatch=%s", rep.ID, rep.NoBatch)
 	return rep, nil
 }
 
@@ -1538,11 +1492,9 @@ func (db *DB) ListBOReportsByProduct(ctx context.Context, kodeProduk string, noB
 		reports = append(reports, rep)
 	}
 
-	log.Printf("✅ Found %d reports after filter", len(reports))
+	log.Printf("Found %d reports after filter", len(reports))
 	return reports, nil
 }
-
-// ──────────────── GET LATEST & LIST BY PRODUCT FOR BK ────────────────
 
 func (db *DB) GetLatestBKReportByProduct(ctx context.Context, kodeProduk string) (*models.BKReport, error) {
 	log.Printf("🔍 GetLatestBKReportByProduct: kode=%s", kodeProduk)
@@ -1569,7 +1521,7 @@ func (db *DB) GetLatestBKReportByProduct(ctx context.Context, kodeProduk string)
 		return nil, err
 	}
 
-	log.Printf("✅ Found BK report: ID=%d, NoBatch=%s", rep.ID, rep.NoBatch)
+	log.Printf("Found BK report: ID=%d, NoBatch=%s", rep.ID, rep.NoBatch)
 	return rep, nil
 }
 
@@ -1618,6 +1570,6 @@ func (db *DB) ListBKReportsByProduct(ctx context.Context, kodeProduk string, noB
 		reports = append(reports, rep)
 	}
 
-	log.Printf("✅ Found %d BK reports", len(reports))
+	log.Printf("Found %d BK reports", len(reports))
 	return reports, nil
 }

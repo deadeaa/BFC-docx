@@ -1,4 +1,3 @@
-// frontend/src/components/pages/LogAktivitasPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { History, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import api from '../../lib/api'
@@ -7,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 import { roleLabel } from '../../lib/roles'
 
-const ROLES: Role[] = ['admin', 'produksi', 'qa']
+const ROLES: Role[] = ['admin', 'produksi', 'qa', 'ts', 'ppic']
 const PAGE_SIZE = 20
 
 function formatDateTime(iso: string): string {
@@ -67,7 +66,6 @@ export default function LogAktivitasPage() {
     return () => clearTimeout(t)
   }, [fetchLogs])
 
-  // Reset ke halaman 1 setiap kali filter berubah
   useEffect(() => {
     setPage(1)
   }, [userName, role, activity, dateFrom, dateTo])
@@ -95,14 +93,15 @@ export default function LogAktivitasPage() {
     const colors: Record<string, string> = {
       admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
       produksi: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-      qa: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      ts: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      ppic: 'bg-orange-100 text-blue-700 dark:bg-orange-900/30 dark:text-orange-300',
+      qa: 'bg-yellow-100 text-yellow-700 dark:bg-green-900/30 dark:text-yellow-300',
     }
     return colors[r] ?? (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600')
   }
 
   return (
     <div className="p-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>
@@ -114,7 +113,6 @@ export default function LogAktivitasPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className={cn('rounded-2xl border p-4 mb-5', cardBg)}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
@@ -191,7 +189,6 @@ export default function LogAktivitasPage() {
         )}
       </div>
 
-      {/* Table */}
       <div className={`rounded-2xl border overflow-hidden ${cardBg}`}>
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -251,7 +248,6 @@ export default function LogAktivitasPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && logs.length > 0 && (
           <div className={cn('flex items-center justify-between px-6 py-3.5 border-t text-sm', isDark ? 'border-gray-700' : 'border-gray-100')}>
             <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
@@ -283,7 +279,6 @@ export default function LogAktivitasPage() {
         )}
       </div>
 
-      {/* Detail Log — read only */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className={`w-full max-w-lg rounded-2xl shadow-2xl border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>

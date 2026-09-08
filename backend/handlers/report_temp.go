@@ -1,4 +1,3 @@
-// backend/handlers/report_template_handler.go
 package handlers
 
 import (
@@ -23,7 +22,6 @@ func NewReportTemplateHandler(db *repository.DB) *ReportTemplateHandler {
 	return &ReportTemplateHandler{db: db}
 }
 
-// GET /api/admin/report-templates
 func (h *ReportTemplateHandler) ListTemplates(c *gin.Context) {
 	templates, err := h.db.ListReportTemplates(c)
 	if err != nil {
@@ -33,7 +31,6 @@ func (h *ReportTemplateHandler) ListTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, templates)
 }
 
-// POST /api/admin/report-templates - Upload ATAU Update template (auto-detect)
 func (h *ReportTemplateHandler) UploadTemplate(c *gin.Context) {
 	kodeProduk := c.PostForm("kode_produk")
 	if kodeProduk == "" {
@@ -47,45 +44,38 @@ func (h *ReportTemplateHandler) UploadTemplate(c *gin.Context) {
 		return
 	}
 
-	// Validasi ekstensi
 	ext := filepath.Ext(file.Filename)
 	if ext != ".docx" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "File harus berformat .docx"})
 		return
 	}
 
-	// Buat direktori
 	uploadDir := "./uploads/templates"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal membuat direktori"})
 		return
 	}
 
-	// Cek apakah template sudah ada
 	existing, _ := h.db.GetReportTemplate(c, kodeProduk)
 
-	// Nama file baru
 	filename := kodeProduk + "_template.docx"
 	filePath := filepath.Join(uploadDir, filename)
 	absPath, _ := filepath.Abs(filePath)
 
-	// Hapus file lama jika ada
 	if existing != nil && existing.FilePath != "" {
 		os.Remove(existing.FilePath)
 	}
 
-	// Simpan file baru
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyimpan file: " + err.Error()})
 		return
 	}
 
-	fmt.Printf("✅ Template saved to: %s\n", absPath)
+	fmt.Printf("Template saved to: %s\n", absPath)
 
 	userID, _ := c.Get("user_id")
 
 	if existing != nil {
-		// ✅ UPDATE - tanpa delete
 		existing.NamaFile = filename
 		existing.FilePath = absPath
 		if err := h.db.UpdateReportTemplate(c, existing); err != nil {
@@ -99,7 +89,6 @@ func (h *ReportTemplateHandler) UploadTemplate(c *gin.Context) {
 		})
 		c.JSON(http.StatusOK, gin.H{"message": "Template berhasil diupdate"})
 	} else {
-		// ✅ CREATE
 		template := &models.ReportTemplate{
 			KodeProduk: kodeProduk,
 			NamaFile:   filename,
@@ -119,7 +108,6 @@ func (h *ReportTemplateHandler) UploadTemplate(c *gin.Context) {
 	}
 }
 
-// GET /api/admin/report-templates/:id
 func (h *ReportTemplateHandler) GetTemplate(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -135,7 +123,6 @@ func (h *ReportTemplateHandler) GetTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, template)
 }
 
-// DELETE /api/admin/report-templates/:id
 func (h *ReportTemplateHandler) DeleteTemplate(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -149,7 +136,6 @@ func (h *ReportTemplateHandler) DeleteTemplate(c *gin.Context) {
 		return
 	}
 
-	// Hapus file fisik
 	if err := os.Remove(template.FilePath); err != nil {
 		fmt.Printf("⚠️ Warning: failed to delete file: %v\n", err)
 	}
@@ -168,9 +154,6 @@ func (h *ReportTemplateHandler) DeleteTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Template berhasil dihapus"})
 }
 
-// backend/handlers/report_template_handler.go
-
-// GET /api/admin/report-templates/:id/download - Download template file
 func (h *ReportTemplateHandler) DownloadTemplate(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -184,13 +167,11 @@ func (h *ReportTemplateHandler) DownloadTemplate(c *gin.Context) {
 		return
 	}
 
-	// Cek file ada
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "File template tidak ditemukan"})
 		return
 	}
 
-	// Kirim file
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+template.NamaFile)
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")

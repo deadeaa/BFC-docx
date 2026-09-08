@@ -1,5 +1,3 @@
-// frontend/src/types/index.ts
-
 export type Role = 'admin' | 'ppic' | 'produksi' | 'qa' | 'ts'
 
 export interface User {
@@ -31,8 +29,6 @@ export interface ApiError {
   message: string
   error?: string
 }
-
-// ── Log Aktivitas / Audit Trail ──────────────────────────────
 
 export interface ActivityLog {
   id: number

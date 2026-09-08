@@ -67,7 +67,6 @@ export default function HistoryModal({
     return <AlertCircle size={14} className="text-red-500" />
   }
 
-  // Get unique batch numbers from history data
   const batchNumbers = Array.from(new Set(history.map(r => r.no_batch).filter(Boolean)))
 
   const parseDetail = (detailJson: string) => {
@@ -86,7 +85,6 @@ export default function HistoryModal({
         'w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden',
         isDark ? 'bg-gray-800' : 'bg-white'
       )}>
-        {/* Header */}
         <div className={cn(
           'flex items-center justify-between p-4 border-b',
           isDark ? 'border-gray-700' : 'border-gray-200'
@@ -123,7 +121,6 @@ export default function HistoryModal({
           </div>
         </div>
 
-        {/* Filter Section */}
         <div className={cn(
           'px-4 py-3 border-b flex items-center gap-3 flex-wrap',
           isDark ? 'border-gray-700' : 'border-gray-200'
@@ -173,7 +170,6 @@ export default function HistoryModal({
           )}
         </div>
 
-        {/* Content */}
         <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(90vh - 200px)' }}>
           {history.length === 0 ? (
             <div className="text-center py-12">
@@ -207,7 +203,6 @@ export default function HistoryModal({
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      {/* Header: No Batch + Badges */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className={cn('text-sm font-semibold', isDark ? 'text-white' : 'text-gray-900')}>
                           <Hash size={14} className="inline mr-1" />
@@ -227,7 +222,6 @@ export default function HistoryModal({
                         </span>
                       </div>
 
-                      {/* Grid Info */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                         <div>
                           <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>Tanggal</span>
@@ -263,7 +257,6 @@ export default function HistoryModal({
                         </div>
                       </div>
 
-                      {/* Detail Materials */}
                       {detail?.materials && detail.materials.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-dashed" 
                           style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}>
@@ -282,7 +275,6 @@ export default function HistoryModal({
                         </div>
                       )}
 
-                      {/* ✅ SYARAT - HANYA MS/TMS SAJA TANPA DETAIL */}
                       {detail?.kriteria && detail.kriteria.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-dashed" 
                           style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}>
@@ -319,7 +311,6 @@ export default function HistoryModal({
                       )}
                     </div>
 
-                    {/* Tombol Muat Data */}
                     <button
                       className={cn(
                         'ml-4 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0',

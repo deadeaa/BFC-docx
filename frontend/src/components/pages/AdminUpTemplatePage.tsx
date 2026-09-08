@@ -1,4 +1,3 @@
-// frontend/src/components/pages/admin/AdminReportTemplatePage.tsx
 import { useState, useEffect } from 'react'
 import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, Pencil, X, RefreshCw, FileDown } from 'lucide-react'
 import api from '../../lib/api'
@@ -145,7 +144,6 @@ export default function AdminReportTemplatePage() {
         </p>
       </div>
 
-      {/* Upload Form */}
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
         <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
           Upload / Update Template
@@ -201,7 +199,6 @@ export default function AdminReportTemplatePage() {
         </button>
       </div>
 
-      {/* Daftar Template */}
       <div className={cn('rounded-xl shadow-sm overflow-hidden', card)}>
         <div className="px-4 py-3 border-b flex justify-between items-center" style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}>
           <h2 className={cn('text-sm font-semibold', isDark ? 'text-gray-200' : 'text-gray-700')}>
@@ -247,7 +244,6 @@ export default function AdminReportTemplatePage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* ✅ Tombol Download - Download langsung */}
                         <button
                           onClick={async () => {
                             try {
@@ -307,7 +303,6 @@ export default function AdminReportTemplatePage() {
         )}
       </div>
 
-      {/* Edit Modal */}
       {isEditModalOpen && editingTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={cn('w-full max-w-md rounded-xl shadow-2xl overflow-hidden', card)}>
@@ -400,7 +395,6 @@ export default function AdminReportTemplatePage() {
         </div>
       )}
 
-      {/* Success/Error Messages */}
       {success && (
         <div className="fixed bottom-4 right-4 flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 z-50">
           <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />

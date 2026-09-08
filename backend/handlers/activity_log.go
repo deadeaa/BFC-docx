@@ -18,7 +18,6 @@ func NewActivityLogHandler(db *repository.DB) *ActivityLogHandler {
 	return &ActivityLogHandler{db: db}
 }
 
-// GET /api/logs
 // Query params (semua opsional):
 //
 //	search     - pencarian bebas (nama user, menu, aktivitas, deskripsi)
@@ -67,7 +66,6 @@ func (h *ActivityLogHandler) List(c *gin.Context) {
 	})
 }
 
-// GET /api/logs/:id — detail satu log, read-only.
 func (h *ActivityLogHandler) Detail(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

@@ -1,4 +1,3 @@
-// backend/index.js
 const express = require('express');
 const cors = require('cors');
 const Docxtemplater = require('docxtemplater');
@@ -21,7 +20,6 @@ function log(message, data = null) {
   }
 }
 
-// Fungsi untuk mencari file di multiple path
 function findTemplateFile(templatePath) {
   const possiblePaths = [
     templatePath,
@@ -39,7 +37,7 @@ function findTemplateFile(templatePath) {
   
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
-      log('✅ Found template at:', p);
+      log('Found template at:', p);
       return p;
     }
   }
@@ -87,7 +85,7 @@ app.post('/generate-docx', async (req, res) => {
       compression: 'DEFLATE',
     });
 
-    log('✅ DOCX generated successfully', { size: buffer.length });
+    log('DOCX generated successfully', { size: buffer.length });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.send(buffer);
@@ -121,7 +119,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ✅ PASTIKAN INI PAKAI PORT_NODE!
 const PORT = process.env.PORT_NODE || 3001;
 app.listen(PORT, () => {
   console.log(`📄 DOCX Service running on port ${PORT}`);

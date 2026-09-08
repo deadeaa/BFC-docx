@@ -1,4 +1,3 @@
-// frontend/src/components/layout/Header.tsx
 import { Sun, Moon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'

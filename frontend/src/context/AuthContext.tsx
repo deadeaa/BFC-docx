@@ -1,4 +1,3 @@
-// frontend/src/context/AuthContext.tsx
 import {
   createContext,
   useContext,
@@ -26,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // On mount, try to fetch current user using stored access token
   useEffect(() => {
     const token = localStorage.getItem('access_token')
     if (!token) {
@@ -56,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.post('/auth/logout')
     } catch {
-      // ignore
     }
     localStorage.removeItem('access_token')
     setUser(null)

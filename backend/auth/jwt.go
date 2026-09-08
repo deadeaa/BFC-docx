@@ -29,7 +29,6 @@ func NewService(secret string) *Service {
 	return &Service{secret: []byte(secret)}
 }
 
-// GenerateAccessToken creates a short-lived JWT
 func (s *Service) GenerateAccessToken(userID int, username, role string) (string, error) {
 	claims := Claims{
 		UserID:   userID,
@@ -43,7 +42,6 @@ func (s *Service) GenerateAccessToken(userID int, username, role string) (string
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
 }
 
-// ValidateAccessToken parses and validates the JWT
 func (s *Service) ValidateAccessToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -61,7 +59,6 @@ func (s *Service) ValidateAccessToken(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-// GenerateRefreshToken creates an opaque random token string
 func GenerateRefreshToken() string {
 	return uuid.New().String() + "-" + uuid.New().String()
 }

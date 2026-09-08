@@ -1,4 +1,3 @@
-// backend/models/models.go
 package models
 
 import (
@@ -13,15 +12,13 @@ const (
 	RolePPIC     Role = "ppic"
 	RoleProduksi Role = "produksi"
 	RoleQA       Role = "qa"
-	RoleTS       Role = "ts" // Technical Support - memiliki akses seperti admin
+	RoleTS       Role = "ts" 
 )
 
-// IsAdminOrTS mengecek apakah role memiliki akses admin penuh
 func (r Role) IsAdminOrTS() bool {
 	return r == RoleAdmin || r == RoleTS
 }
 
-// IsSignupAllowed mengecek apakah role diizinkan untuk signup mandiri
 func (r Role) IsSignupAllowed() bool {
 	return r == RoleProduksi || r == RoleQA || r == RolePPIC
 }
@@ -30,7 +27,7 @@ type User struct {
 	ID        int       `json:"id"`
 	Username  string    `json:"username"`
 	FullName  string    `json:"full_name"`
-	Password  string    `json:"-"` // hashed, never serialized
+	Password  string    `json:"-"` 
 	Role      Role      `json:"role"`
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
@@ -68,8 +65,6 @@ type ActivityLogListResponse struct {
 	Page     int           `json:"page"`
 	PageSize int           `json:"page_size"`
 }
-
-// ── Batch Khusus Models ──────────────────────────────────────
 
 type BKMaterial struct {
 	ID            int     `json:"id"`
@@ -128,8 +123,6 @@ type CreateBKReportRequest struct {
 	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
 }
 
-// ── Batch Overfilled Models ──────────────────────────────────
-
 type BOMaterial struct {
 	ID            int     `json:"id"`
 	ProductID     int     `json:"product_id"`
@@ -187,10 +180,6 @@ type CreateBOReportRequest struct {
 	Kesimpulan   string          `json:"kesimpulan" binding:"required"`
 	Detail       json.RawMessage `json:"detail" binding:"required"`
 }
-
-// ──────────────────────────────────────────────────────────────
-// ── ADMIN CONFIG MODELS ──────────────────────────────────────
-// ──────────────────────────────────────────────────────────────
 
 type AdminBKProductConfig struct {
 	ID            int     `json:"id"`

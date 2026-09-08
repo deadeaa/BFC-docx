@@ -1,4 +1,3 @@
-// backend/middleware/auth.go
 package middleware
 
 import (
@@ -15,7 +14,6 @@ const CtxUserID = "user_id"
 const CtxUsername = "username"
 const CtxRole = "role"
 
-// Auth validates the JWT access token
 func Auth(jwtSvc *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -36,7 +34,6 @@ func Auth(jwtSvc *auth.Service) gin.HandlerFunc {
 	}
 }
 
-// RequireRole checks that the authenticated user has one of the given roles.
 func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get(CtxRole)
@@ -51,7 +48,6 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	}
 }
 
-// AdminOrTSOnly middleware untuk membatasi akses hanya untuk Admin dan TS
 func AdminOrTSOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get(CtxRole)
@@ -66,7 +62,6 @@ func AdminOrTSOnly() gin.HandlerFunc {
 			return
 		}
 		
-		// Admin atau TS yang memiliki akses penuh
 		if roleStr != "admin" && roleStr != "ts" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
 			return
@@ -76,7 +71,6 @@ func AdminOrTSOnly() gin.HandlerFunc {
 	}
 }
 
-// IdleCheck returns true if idle time has exceeded 24h
 func IdleCheck(lastActivity time.Time) bool {
 	return time.Since(lastActivity) > 24*time.Hour
 }

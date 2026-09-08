@@ -1,4 +1,3 @@
-// frontend/src/components/HistoryModalBK.tsx
 import { X, Clock, CheckCircle2, AlertCircle, FileText, Calendar, User, Hash, Filter, RefreshCw } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -54,7 +53,6 @@ export default function HistoryModalBK({
 }: HistoryModalBKProps) {
   if (!isOpen) return null
 
-  // Get unique batch numbers for filter dropdown
   const batchNumbers = Array.from(new Set(history.map(r => r.no_batch).filter(Boolean)))
 
   return (
@@ -63,7 +61,6 @@ export default function HistoryModalBK({
         'w-full max-w-6xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden',
         isDark ? 'bg-gray-800' : 'bg-white'
       )}>
-        {/* Header */}
         <div className={cn(
           'flex items-center justify-between p-4 border-b',
           isDark ? 'border-gray-700' : 'border-gray-200'
@@ -99,7 +96,6 @@ export default function HistoryModalBK({
           </div>
         </div>
 
-        {/* Filter */}
         <div className={cn(
           'px-4 py-3 border-b flex items-center gap-3 flex-wrap',
           isDark ? 'border-gray-700' : 'border-gray-200'
@@ -133,7 +129,6 @@ export default function HistoryModalBK({
           )}
         </div>
 
-        {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-160px)] p-4">
           {history.length === 0 ? (
             <div className="text-center py-12">

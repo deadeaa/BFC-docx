@@ -1,4 +1,3 @@
-// backend/handlers/auth.go
 package handlers
 
 import (
@@ -24,7 +23,6 @@ func NewAuthHandler(db *repository.DB, jwtSvc *auth.Service) *AuthHandler {
 	return &AuthHandler{db: db, jwtSvc: jwtSvc}
 }
 
-// POST /api/auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
@@ -80,7 +78,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// POST /api/auth/refresh-token
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil || refreshToken == "" {
@@ -125,7 +122,6 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
 }
 
-// POST /api/auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refresh_token")
 	if refreshToken != "" {
@@ -139,8 +135,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout berhasil"})
 }
 
-// POST /api/auth/register
-//
 // Endpoint publik (tidak memerlukan JWT) untuk Sign Up mandiri. Role yang
 // boleh dipilih HANYA "produksi", "qa", atau "ppic" — role "admin" dan "ts" 
 // tidak boleh dibuat melalui endpoint ini.
@@ -199,7 +193,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Registrasi berhasil, silakan login"})
 }
 
-// GET /api/auth/me
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID, _ := c.Get(middleware.CtxUserID)
 	uid, _ := userID.(int)

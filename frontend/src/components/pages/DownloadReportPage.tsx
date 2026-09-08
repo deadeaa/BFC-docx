@@ -1,4 +1,3 @@
-// frontend/src/components/pages/DownloadReportPage.tsx
 import { useState, useEffect, useCallback } from 'react'
 import { FileDown, ChevronDown, AlertCircle, CheckCircle2, FileText, Tag } from 'lucide-react'
 import api from '../../lib/api'
@@ -41,9 +40,6 @@ export default function DownloadReportPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // ============================================================
-  // LOAD PRODUCTS
-  // ============================================================
   useEffect(() => {
     api.get('/batch-khusus/products')
       .then((res) => {
@@ -56,9 +52,6 @@ export default function DownloadReportPage() {
       .catch(() => {})
   }, [])
 
-  // ============================================================
-  // GET FILTERED PRODUCTS BASED ON JENIS PRODUK
-  // ============================================================
   const filteredProducts = products.filter((p) => {
     const kode = p.kode_produk.toUpperCase()
     
@@ -70,12 +63,9 @@ export default function DownloadReportPage() {
       return kode.startsWith('X')
     }
     
-    return true // default: semua
+    return true 
   })
 
-  // ============================================================
-  // LOAD BK REPORTS
-  // ============================================================
   const loadBKReports = useCallback(async (kode: string) => {
     if (!kode) {
       setBkReports([])
@@ -103,9 +93,6 @@ export default function DownloadReportPage() {
     }
   }, [])
 
-  // ============================================================
-  // HANDLE SELECT PRODUCT
-  // ============================================================
   const handleSelectKode = (kode: string) => {
     setSelectedKode(kode)
     setSelectedBK(null)
@@ -119,9 +106,6 @@ export default function DownloadReportPage() {
     }
   }
 
-  // ============================================================
-  // HANDLE JENIS PRODUK CHANGE
-  // ============================================================
   const handleJenisProdukChange = (value: 'ruah' | 'minor' | '') => {
     setJenisProduk(value)
     setSelectedKode('')
@@ -131,9 +115,6 @@ export default function DownloadReportPage() {
     setSuccess('')
   }
 
-  // ============================================================
-  // FORMAT DATE
-  // ============================================================
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-'
     
@@ -172,9 +153,6 @@ export default function DownloadReportPage() {
     }
   }
 
-  // ============================================================
-  // DOWNLOAD REPORT
-  // ============================================================
   const handleDownload = async () => {
     if (!selectedKode) {
       setError('Pilih kode produk terlebih dahulu')
@@ -226,9 +204,6 @@ export default function DownloadReportPage() {
     }
   }
 
-  // ============================================================
-  // STYLING
-  // ============================================================
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
   const inputBase = cn(
     'w-full px-3 py-2 rounded-lg border text-sm transition-colors outline-none',
@@ -251,12 +226,8 @@ export default function DownloadReportPage() {
     )
   }
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-green-500/10">
@@ -274,7 +245,6 @@ export default function DownloadReportPage() {
       </div>
 
       <div className={cn('rounded-xl p-5 shadow-sm', card)}>
-        {/* ✅ Pilih Jenis Produk */}
         <div className="mb-4">
           <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
             Jenis Produk <span className="text-red-500">*</span>
@@ -297,7 +267,6 @@ export default function DownloadReportPage() {
           </p>
         </div>
 
-        {/* Pilih Produk - Hanya tampil setelah pilih jenis */}
         {jenisProduk && (
           <div className="mb-4">
             <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -326,7 +295,6 @@ export default function DownloadReportPage() {
           </div>
         )}
 
-        {/* Pilih BK Report */}
         {selectedKode && (
           <div className="mb-4">
             <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -364,7 +332,6 @@ export default function DownloadReportPage() {
           </div>
         )}
 
-        {/* Preview pilihan */}
         {selectedBK && (
           <div className={cn(
             'p-4 rounded-lg mb-4 border',
@@ -394,7 +361,6 @@ export default function DownloadReportPage() {
           </div>
         )}
 
-        {/* Error / Success */}
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
             <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
@@ -408,7 +374,6 @@ export default function DownloadReportPage() {
           </div>
         )}
 
-        {/* Tombol Download */}
         <button
           onClick={handleDownload}
           disabled={!selectedKode || downloading || !selectedBK}

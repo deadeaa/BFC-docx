@@ -6,11 +6,11 @@ export default {
     extend: {
       colors: {
         brand: {
-          green: '#2D6A4F',       // hijau tua earthy (primary)
-          'green-light': '#52B788', // hijau cerah (accent)
-          'green-muted': '#95D5B2', // hijau muda (hover/soft)
-          bg: '#F5F0E8',           // krem/beige background
-          sidebar: '#1B4332',      // hijau gelap sidebar
+          green: '#2D6A4F',       
+          'green-light': '#52B788', 
+          'green-muted': '#95D5B2', 
+          bg: '#F5F0E8',           
+          sidebar: '#1B4332',     
         },
       },
       keyframes: {

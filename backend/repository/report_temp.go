@@ -1,4 +1,3 @@
-// backend/repository/report_template_repo.go
 package repository
 
 import (
@@ -6,7 +5,6 @@ import (
 	"bfc-backend/models"
 )
 
-// SaveReportTemplate - Simpan template baru
 func (db *DB) SaveReportTemplate(ctx context.Context, template *models.ReportTemplate) error {
 	query := `
 		INSERT INTO report_templates (kode_produk, nama_file, file_path, created_by)
@@ -17,7 +15,6 @@ func (db *DB) SaveReportTemplate(ctx context.Context, template *models.ReportTem
 	return err
 }
 
-// UpdateReportTemplate - Update template
 func (db *DB) UpdateReportTemplate(ctx context.Context, template *models.ReportTemplate) error {
 	query := `
 		UPDATE report_templates 
@@ -29,7 +26,6 @@ func (db *DB) UpdateReportTemplate(ctx context.Context, template *models.ReportT
 	return err
 }
 
-// GetReportTemplateByID - Ambil template berdasarkan ID
 func (db *DB) GetReportTemplateByID(ctx context.Context, id int) (*models.ReportTemplate, error) {
 	var t models.ReportTemplate
 	query := `SELECT id, kode_produk, nama_file, file_path, created_by, created_at, updated_at 
@@ -43,7 +39,6 @@ func (db *DB) GetReportTemplateByID(ctx context.Context, id int) (*models.Report
 	return &t, nil
 }
 
-// GetReportTemplate - Ambil template berdasarkan kode_produk
 func (db *DB) GetReportTemplate(ctx context.Context, kodeProduk string) (*models.ReportTemplate, error) {
 	var t models.ReportTemplate
 	query := `SELECT id, kode_produk, nama_file, file_path, created_by, created_at, updated_at 
@@ -57,7 +52,6 @@ func (db *DB) GetReportTemplate(ctx context.Context, kodeProduk string) (*models
 	return &t, nil
 }
 
-// ListReportTemplates - Ambil semua template
 func (db *DB) ListReportTemplates(ctx context.Context) ([]models.ReportTemplate, error) {
 	rows, err := db.pool.Query(ctx, `SELECT id, kode_produk, nama_file, file_path, created_by, created_at, updated_at 
 	                                 FROM report_templates ORDER BY kode_produk`)
@@ -78,7 +72,6 @@ func (db *DB) ListReportTemplates(ctx context.Context) ([]models.ReportTemplate,
 	return templates, nil
 }
 
-// DeleteReportTemplate - Hapus template
 func (db *DB) DeleteReportTemplate(ctx context.Context, id int) error {
 	_, err := db.pool.Exec(ctx, `DELETE FROM report_templates WHERE id = $1`, id)
 	return err
