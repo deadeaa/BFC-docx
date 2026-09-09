@@ -1,9 +1,7 @@
 version: '3.8'
 
 services:
-  # ============================================================
   # POSTGRESQL DATABASE
-  # ============================================================
   db:
     image: postgres:15-alpine
     container_name: bfc_db
@@ -24,9 +22,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ============================================================
   # BACKEND (Go + Node.js di dalam 1 container)
-  # ============================================================
   backend:
     build:
       context: ./backend
@@ -51,9 +47,7 @@ services:
     networks:
       - bfc_network
 
-  # ============================================================
   # FRONTEND (React/Vite)
-  # ============================================================
   frontend:
     build:
       context: ./frontend
