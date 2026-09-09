@@ -3,6 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
+import b7LogoWhite from '../../assets/B7-logo-white.png'
+
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -200,7 +202,7 @@ export default function LoginPage() {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <img
-              src="/src/assets/B7-logo-white.png"
+              src={b7LogoWhite}
               alt="Bintang Toedjoe"
               className="bfc-logo"
               style={{

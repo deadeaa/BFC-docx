@@ -49,6 +49,7 @@ func main() {
 	r := gin.Default()
 
 	r.Use(middleware.ErrorHandler())
+	r.MaxMultipartMemory = 10 << 20 // 10 MB
 
 	wd, err := os.Getwd()
 	if err != nil {

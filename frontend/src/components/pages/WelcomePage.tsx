@@ -1,29 +1,30 @@
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
-// Safe zones: left edge (0–18%) and right edge (82–100%) only
-// Center zone (18%–82%) is completely clear — no products
-// Products strictly in 4 corners, no center drift
-const PRODUCTS = [
-  // TOP-LEFT — 2 products, stacked
-  { src: '/src/assets/extrajoss.png',   top: '5%',  left: '1%',  rot:  3, delay: '0.0s', spd: 9  },
-  { src: '/src/assets/komix.png',       top: '22%', left: '6%',  rot: -5, delay: '0.5s', spd: 7  },
-  // MID-LEFT — 1 product
-  { src: '/src/assets/femmy.png',       top: '55%', left: '2%',  rot:  4, delay: '0.9s', spd: 6  },
-  // BOTTOM-LEFT — 1 product
-  { src: '/src/assets/puyer.png',       top: '75%', left: '3%',  rot: -3, delay: '1.3s', spd: 8  },
+import extrajoss from '../../assets/extrajoss.png'
+import komix from '../../assets/komix.png'
+import femmy from '../../assets/femmy.png'
+import puyer from '../../assets/puyer.png'
+import bejo from '../../assets/bejo.png'
+import ejsport from '../../assets/ejsport.png'
+import slasi from '../../assets/slasi.png'
+import komixherbal from '../../assets/komixherbal.png'
+import waisan from '../../assets/waisan.png'
 
-  // TOP-RIGHT — 2 products, stacked
-  { src: '/src/assets/bejo.png',        top: '4%',  left: '83%', rot:  5, delay: '0.2s', spd: 9  },
-  { src: '/src/assets/ejsport.png',     top: '20%', left: '87%', rot: -4, delay: '0.7s', spd: 7  },
-  // MID-RIGHT — 1 product
-  { src: '/src/assets/slasi.png',       top: '55%', left: '86%', rot: -3, delay: '1.1s', spd: 6  },
-  // BOTTOM-RIGHT — 2 products
-  { src: '/src/assets/komixherbal.png', top: '72%', left: '83%', rot: -5, delay: '1.5s', spd: 8  },
-  { src: '/src/assets/waisan.png',      top: '82%', left: '88%', rot:  3, delay: '1.9s', spd: 5  },
+const PRODUCTS = [
+  { src: extrajoss,    top: '5%',  left: '1%',  rot:  3, delay: '0.0s', spd: 9 },
+  { src: komix,        top: '22%', left: '6%',  rot: -5, delay: '0.5s', spd: 7 },
+  { src: femmy,        top: '55%', left: '2%',  rot:  4, delay: '0.9s', spd: 6 },
+  { src: puyer,        top: '75%', left: '3%',  rot: -3, delay: '1.3s', spd: 8 },
+
+  { src: bejo,         top: '4%',  left: '83%', rot:  5, delay: '0.2s', spd: 9 },
+  { src: ejsport,      top: '20%', left: '87%', rot: -4, delay: '0.7s', spd: 7 },
+  { src: slasi,        top: '55%', left: '86%', rot: -3, delay: '1.1s', spd: 6 },
+  { src: komixherbal,  top: '72%', left: '83%', rot: -5, delay: '1.5s', spd: 8 },
+  { src: waisan,       top: '82%', left: '88%', rot:  3, delay: '1.9s', spd: 5 },
 ]
 
-const SIZE = 88 // px — all identical
+const SIZE = 88 
 
 function toTitleCase(s: string) {
   return s.toLowerCase().split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')

@@ -5,6 +5,8 @@ import api from '../../lib/api'
 import type { Role } from '../../types'
 import { roleLabel, SIGNUP_ROLES } from '../../lib/roles'
 
+import b7LogoWhite from '../../assets/B7-logo-white.png'
+
 export default function SignUpPage() {
   const navigate = useNavigate()
 
@@ -236,7 +238,7 @@ export default function SignUpPage() {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <img
-              src="/src/assets/B7-logo-white.png"
+              src={b7LogoWhite}
               alt="Bintang Toedjoe"
               className="bfc-logo"
               style={{
