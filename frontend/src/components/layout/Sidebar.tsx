@@ -17,6 +17,8 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
+import b7LogoWhite from '../../assets/B7-logo-white.png'
+
 const calcItems = [
   { name: 'Batch Overfilled', path: '/perhitungan/batch-overfilled' },
   { name: 'Batch Khusus', path: '/perhitungan/batch-khusus' },
@@ -101,7 +103,7 @@ export default function Sidebar() {
         ) : (
           <div className="py-4 pl-5 pr-4 flex items-center justify-between h-20 overflow-hidden">
             <img
-              src="/src/assets/B7-logo-white.png"
+              src={b7LogoWhite}
               alt="Bintang Toedjoe"
               className="h-24 w-auto object-contain object-top -mt-2"
             />

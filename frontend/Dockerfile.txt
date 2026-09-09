@@ -13,7 +13,7 @@ FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN echo 'client_max_body_size 10M ; \
+RUN echo 'client_max_body_size 20M ; \
     server { \
         listen 80; \
         location / { \
