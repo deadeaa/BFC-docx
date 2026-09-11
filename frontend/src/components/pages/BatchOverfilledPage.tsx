@@ -208,6 +208,7 @@ export default function BatchOverfilledPage() {
   const [loadingLatest, setLoadingLatest] = useState(false)
 
   const [savedReport, setSavedReport] = useState<BOReport | null>(null)
+  const [dataChanged, setDataChanged] = useState(false)  
 
   const [latestReport, setLatestReport] = useState<BOReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -313,17 +314,12 @@ export default function BatchOverfilledPage() {
     }
   }, [selectedKode, filterNoBatch])
 
-  useEffect(() => {
-    if (selectedKode && showHistory) {
-      loadHistory(selectedKode)
-    }
-  }, [filterNoBatch, selectedKode, showHistory, loadHistory])
-
   const handleSelectKode = useCallback(async (kode: string) => {
     setSelectedKode(kode)
     setProduct(null)
     setLatestReport(null)
-    setSavedReport(null)  
+    setSavedReport(null)
+    setDataChanged(false)
     setInputRaws([])
     setBobotTotalRaw('')
     setNoBatch('')
@@ -363,6 +359,8 @@ export default function BatchOverfilledPage() {
             setBobotTotalRaw(reportRes.data.bobot_total?.toString() || '')
             setNoBatch(reportRes.data.no_batch || '')
           }
+          setSavedReport(reportRes.data)  
+          setDataChanged(false)
         }
       } catch (err) {
         console.log('ℹ️ No latest report found for:', kode)
@@ -381,6 +379,12 @@ export default function BatchOverfilledPage() {
       setLoadingLatest(false)
     }
   }, [loadHistory])
+
+  useEffect(() => {
+    if (selectedKode && showHistory) {
+      loadHistory(selectedKode)
+    }
+  }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
   async function handleSave() {
     if (!product || !tglPembuatan) {
@@ -439,7 +443,8 @@ export default function BatchOverfilledPage() {
       const response = await api.post<BOReport>('/batch-overfilled/reports', payload)
       
       setLatestReport(response.data)
-      setSavedReport(response.data)  
+      setSavedReport(response.data)
+      setDataChanged(false) 
       setHistoryData(prev => [response.data, ...prev])
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 4000)
@@ -452,13 +457,23 @@ export default function BatchOverfilledPage() {
     }
   }
 
-  const isExportable = !!savedReport && savedReport.no_batch === noBatch.trim() && allFilled
+  const isExportable = 
+    !!product 
+    && allFilled 
+    && !!savedReport 
+    && savedReport.no_batch === noBatch.trim()
+    && !dataChanged
 
   function handleExportPDF() {
     if (!product || !allFilled || nilaiTertinggi == null || bobotTotal == null) return
     
     if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
       setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
+      return
+    }
+    
+    if (dataChanged) {
+      setSaveError('⚠️ Data telah diubah. Simpan ulang sebelum export PDF')
       return
     }
     
@@ -785,7 +800,7 @@ export default function BatchOverfilledPage() {
                           value={inputRaws[i] ?? ''}
                           onChange={e => {
                             setInputRaws(prev => prev.map((v, idx) => idx === i ? e.target.value : v))
-                            if (savedReport) setSavedReport(null)
+                            setDataChanged(true)  
                           }}
                           className={greenInput}
                         />
@@ -799,7 +814,7 @@ export default function BatchOverfilledPage() {
                         value={bobotTotalRaw}
                         onChange={e => {
                           setBobotTotalRaw(e.target.value)
-                          if (savedReport) setSavedReport(null)
+                          setDataChanged(true)  
                         }}
                         className={greenInput}
                       />
@@ -1000,7 +1015,7 @@ export default function BatchOverfilledPage() {
                   value={noBatch}
                   onChange={e => {
                     setNoBatch(e.target.value)
-                    if (savedReport) setSavedReport(null)
+                    setDataChanged(true)  
                   }}
                   placeholder="Contoh: BATCH-001"
                   className={inputBase}
@@ -1079,9 +1094,11 @@ export default function BatchOverfilledPage() {
               </button>
             </div>
 
-            {!savedReport && allFilled && (
+            {allFilled && (!savedReport || dataChanged) && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                ⚠️ Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF
+                ⚠️ {dataChanged 
+                  ? 'Data telah diubah. Simpan ulang sebelum export PDF' 
+                  : 'Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF'}
               </p>
             )}
 
@@ -1111,7 +1128,8 @@ export default function BatchOverfilledPage() {
                 setBobotTotalRaw(report.bobot_total?.toString() || '')
                 setNoBatch(report.no_batch || '')
                 setLatestReport(report)
-                setSavedReport(report) 
+                setSavedReport(report)
+                setDataChanged(false)  
                 setShowHistory(false)
               } catch (e) {
                 console.error('Error parsing report detail:', e)

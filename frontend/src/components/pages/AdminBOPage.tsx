@@ -401,7 +401,7 @@ export default function AdminBatchOverfilledPage() {
           <div className={cn('w-full max-w-6xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden', card)}>
             <div className={cn('flex items-center justify-between p-4 border-b', isDark ? 'border-gray-700' : 'border-gray-200')}>
               <h2 className={cn('text-lg font-bold', isDark ? 'text-white' : 'text-gray-900')}>
-                {isEditing ? `Edit Produk: ${formData.kode_produk}` : 'Tambah Produk Batch Overfilled'}
+                {isEditing ? `Edit Produk Batch Overfilled: ${formData.kode_produk}` : 'Tambah Produk Batch Overfilled'}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')}>
                 <X size={20} className={isDark ? 'text-gray-400' : 'text-gray-600'} />

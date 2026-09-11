@@ -29,8 +29,6 @@ interface BOReportListResponse {
 
 const PAGE_SIZE = 50
 
-// Menampilkan Tanggal + Jam menggunakan timestamp asli dari database
-// (created_at), bukan waktu buatan. Contoh: "22 Jul 2026, 14.37"
 function fmtDateTime(dateStr: string): string {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
@@ -80,8 +78,6 @@ export default function ReportBatchOverfilledPage() {
     }
   }, [page, search])
 
-  // Debounce pencarian agar tidak memanggil API di setiap keystroke.
-  // Search tetap menggunakan pagination dari backend (bukan filter frontend).
   useEffect(() => {
     const t = setTimeout(fetchReports, 350)
     return () => clearTimeout(t)
@@ -125,6 +121,7 @@ export default function ReportBatchOverfilledPage() {
       'No':             (page - 1) * PAGE_SIZE + i + 1,
       'Kode Produk':    r.kode_produk,
       'Nama Produk':    r.nama_produk ?? '',
+      'No. Batch':      r.no_batch ?? '',
       'Tgl Pembuatan':  fmtDateTime(r.created_at),
       'Bobot Total':    r.bobot_total,
       'Kesimpulan':     r.kesimpulan,
@@ -137,6 +134,7 @@ export default function ReportBatchOverfilledPage() {
       { wch: 5 },   // No
       { wch: 14 },  // Kode Produk
       { wch: 32 },  // Nama Produk
+      { wch: 18 },  // No. Batch
       { wch: 20 },  // Tgl Pembuatan
       { wch: 14 },  // Bobot Total
       { wch: 12 },  // Kesimpulan
@@ -252,6 +250,7 @@ export default function ReportBatchOverfilledPage() {
                   <th className={th}>No</th>
                   <th className={th}>Kode Produk</th>
                   <th className={th}>Nama Produk</th>
+                  <th className={th}>No. Batch</th>
                   <th className={th}>Tanggal Pembuatan</th>
                   <th className={cn(th, 'text-right')}>Bobot Total</th>
                   <th className={th}>Kesimpulan</th>
@@ -276,6 +275,9 @@ export default function ReportBatchOverfilledPage() {
                     </td>
                     <td className={cn(td, 'max-w-[200px] truncate')} title={r.nama_produk}>
                       {r.nama_produk ?? '—'}
+                    </td>
+                    <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>
+                      {r.no_batch || '—'}
                     </td>
                     <td className={cn(td, 'whitespace-nowrap')}>{fmtDateTime(r.created_at)}</td>
                     <td className={cn(td, 'text-right font-semibold tabular-nums')}>

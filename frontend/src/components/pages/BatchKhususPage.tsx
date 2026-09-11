@@ -85,6 +85,7 @@ export default function BatchKhususPage() {
   const [saveError, setSaveError] = useState('')
 
   const [savedReport, setSavedReport] = useState<BKReport | null>(null)
+  const [dataChanged, setDataChanged] = useState(false)  
 
   const [latestReport, setLatestReport] = useState<BKReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -115,7 +116,8 @@ export default function BatchKhususPage() {
     setSelectedKode('')
     setProduct(null)
     setLatestReport(null)
-    setSavedReport(null)  
+    setSavedReport(null)
+    setDataChanged(false)
     setInputRaw('')
     setNoBatch('')
     setSaveSuccess(false)
@@ -124,11 +126,29 @@ export default function BatchKhususPage() {
     setHistoryData([])
   }
 
+  const loadHistory = useCallback(async (kode?: string) => {
+    const targetKode = kode || selectedKode
+    if (!targetKode) return
+
+    setLoadingHistory(true)
+    try {
+      const res = await api.get<BKReport[]>(`/batch-khusus/reports/product/${targetKode}`, {
+        params: { no_batch: filterNoBatch || undefined }
+      })
+      setHistoryData(res.data || [])
+    } catch {
+      setHistoryData([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [selectedKode, filterNoBatch])
+
   const handleSelectKode = useCallback(async (kode: string) => {
     setSelectedKode(kode)
     setProduct(null)
     setLatestReport(null)
-    setSavedReport(null)  
+    setSavedReport(null)
+    setDataChanged(false)
     setInputRaw('')
     setNoBatch('')
     setSaveSuccess(false)
@@ -151,6 +171,8 @@ export default function BatchKhususPage() {
           setLatestReport(reportRes.data)
           setInputRaw(reportRes.data.input_sisa_minor?.toString() || '')
           setNoBatch(reportRes.data.no_batch || '')
+          setSavedReport(reportRes.data)  
+          setDataChanged(false)
         }
       } catch {
       }
@@ -163,7 +185,7 @@ export default function BatchKhususPage() {
       setLoadingProduct(false)
       setLoadingLatest(false)
     }
-  }, [])
+  }, [loadHistory])
 
   const d5 = parseFloat(inputRaw) || 0
 
@@ -200,23 +222,6 @@ export default function BatchKhususPage() {
 
   const rangeValues = computeRangeValues()
 
-  const loadHistory = useCallback(async (kode?: string) => {
-    const targetKode = kode || selectedKode
-    if (!targetKode) return
-
-    setLoadingHistory(true)
-    try {
-      const res = await api.get<BKReport[]>(`/batch-khusus/reports/product/${targetKode}`, {
-        params: { no_batch: filterNoBatch || undefined }
-      })
-      setHistoryData(res.data || [])
-    } catch {
-      setHistoryData([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }, [selectedKode, filterNoBatch])
-
   useEffect(() => {
     if (selectedKode && showHistory) {
       loadHistory(selectedKode)
@@ -249,7 +254,8 @@ export default function BatchKhususPage() {
       })
       setSaveSuccess(true)
       setLatestReport(res.data)
-      setSavedReport(res.data)  
+      setSavedReport(res.data)
+      setDataChanged(false)  
       setTimeout(() => setSaveSuccess(false), 4000)
     } catch {
       setSaveError('Gagal menyimpan. Coba lagi.')
@@ -258,13 +264,23 @@ export default function BatchKhususPage() {
     }
   }
 
-  const isExportable = !!savedReport && savedReport.no_batch === noBatch.trim() && d5 > 0 && !!product
+  const isExportable = 
+    !!product 
+    && d5 > 0 
+    && !!savedReport 
+    && savedReport.no_batch === noBatch.trim()
+    && !dataChanged
 
   function handleExportPDF() {
     if (!product || d5 <= 0) return
- 
+    
     if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
       setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
+      return
+    }
+    
+    if (dataChanged) {
+      setSaveError('⚠️ Data telah diubah. Simpan ulang sebelum export PDF')
       return
     }
     
@@ -601,7 +617,7 @@ export default function BatchKhususPage() {
                             value={inputRaw}
                             onChange={e => {
                               setInputRaw(e.target.value)
-                              if (savedReport) setSavedReport(null)
+                              setDataChanged(true)  
                             }}
                             className={greenInput}
                           />
@@ -691,7 +707,7 @@ export default function BatchKhususPage() {
                   value={noBatch}
                   onChange={e => {
                     setNoBatch(e.target.value)
-                    if (savedReport) setSavedReport(null)
+                    setDataChanged(true) 
                   }}
                   placeholder="Contoh: BATCH-001"
                   className={inputBase}
@@ -773,9 +789,11 @@ export default function BatchKhususPage() {
               </button>
             </div>
 
-            {!savedReport && d5 > 0 && (
+            {d5 > 0 && (!savedReport || dataChanged) && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                ⚠️ Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF
+                ⚠️ {dataChanged 
+                  ? 'Data telah diubah. Simpan ulang sebelum export PDF' 
+                  : 'Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF'}
               </p>
             )}
 
@@ -797,7 +815,8 @@ export default function BatchKhususPage() {
             setInputRaw(report.input_sisa_minor?.toString() || '')
             setNoBatch(report.no_batch || '')
             setLatestReport(report)
-            setSavedReport(report)  
+            setSavedReport(report)
+            setDataChanged(false)  
             setShowHistory(false)
           }}
           filterNoBatch={filterNoBatch}
