@@ -49,7 +49,6 @@ interface BKReport {
   created_at: string
 }
 
-// Format angka dengan 2 desimal, hilangkan trailing zeros
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v == null || isNaN(v)) return '-'
   const formatted = v.toFixed(decimals)
@@ -85,6 +84,8 @@ export default function BatchKhususPage() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
 
+  const [savedReport, setSavedReport] = useState<BKReport | null>(null)
+
   const [latestReport, setLatestReport] = useState<BKReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [historyData, setHistoryData] = useState<BKReport[]>([])
@@ -114,6 +115,7 @@ export default function BatchKhususPage() {
     setSelectedKode('')
     setProduct(null)
     setLatestReport(null)
+    setSavedReport(null)  
     setInputRaw('')
     setNoBatch('')
     setSaveSuccess(false)
@@ -126,6 +128,7 @@ export default function BatchKhususPage() {
     setSelectedKode(kode)
     setProduct(null)
     setLatestReport(null)
+    setSavedReport(null)  
     setInputRaw('')
     setNoBatch('')
     setSaveSuccess(false)
@@ -246,6 +249,7 @@ export default function BatchKhususPage() {
       })
       setSaveSuccess(true)
       setLatestReport(res.data)
+      setSavedReport(res.data)  
       setTimeout(() => setSaveSuccess(false), 4000)
     } catch {
       setSaveError('Gagal menyimpan. Coba lagi.')
@@ -254,8 +258,16 @@ export default function BatchKhususPage() {
     }
   }
 
+  const isExportable = !!savedReport && savedReport.no_batch === noBatch.trim() && d5 > 0 && !!product
+
   function handleExportPDF() {
     if (!product || d5 <= 0) return
+ 
+    if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
+      setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
+      return
+    }
+    
     const createdBy = user?.full_name || user?.username || 'User'
     const dateStr = formatDateForFilename(tglPembuatan)
     const filename = `Calculation_Batch_Khusus_${dateStr}`
@@ -587,7 +599,10 @@ export default function BatchKhususPage() {
                             inputMode="decimal"
                             placeholder="0"
                             value={inputRaw}
-                            onChange={e => setInputRaw(e.target.value)}
+                            onChange={e => {
+                              setInputRaw(e.target.value)
+                              if (savedReport) setSavedReport(null)
+                            }}
                             className={greenInput}
                           />
                         ) : (
@@ -674,7 +689,10 @@ export default function BatchKhususPage() {
                 <input
                   type="text"
                   value={noBatch}
-                  onChange={e => setNoBatch(e.target.value)}
+                  onChange={e => {
+                    setNoBatch(e.target.value)
+                    if (savedReport) setSavedReport(null)
+                  }}
                   placeholder="Contoh: BATCH-001"
                   className={inputBase}
                 />
@@ -689,7 +707,7 @@ export default function BatchKhususPage() {
                   disabled
                   className={cn(inputBase, 'opacity-60 cursor-not-allowed')}
                 />
-                <p className="text-xs text-gray-400 mt-1">✅ Otomatis tanggal hari ini</p>
+                <p className="text-xs text-gray-400 mt-1">Otomatis tanggal hari ini</p>
               </div>
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -742,7 +760,8 @@ export default function BatchKhususPage() {
 
               <button
                 onClick={handleExportPDF}
-                disabled={!d5 || !product}
+                disabled={!isExportable}
+                title={!isExportable ? '⚠️ Simpan laporan terlebih dahulu sebelum export PDF' : 'Export PDF'}
                 className={cn(
                   'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -753,6 +772,12 @@ export default function BatchKhususPage() {
                 Export PDF
               </button>
             </div>
+
+            {!savedReport && d5 > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
+                ⚠️ Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF
+              </p>
+            )}
 
             <p className={cn('text-xs mt-3 font-mono', isDark ? 'text-gray-500' : 'text-gray-400')}>
               Calculation_Batch_Khusus_{formatDateForFilename(tglPembuatan)}
@@ -772,6 +797,7 @@ export default function BatchKhususPage() {
             setInputRaw(report.input_sisa_minor?.toString() || '')
             setNoBatch(report.no_batch || '')
             setLatestReport(report)
+            setSavedReport(report)  
             setShowHistory(false)
           }}
           filterNoBatch={filterNoBatch}

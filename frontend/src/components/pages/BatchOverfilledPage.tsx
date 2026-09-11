@@ -130,7 +130,6 @@ function calculateCriteria(
     }))
   }
 
-  // Cari pivot (material dengan ratio tertinggi)
   const ratioVals = ratio as number[]
   const pivotIdx = findPivotIndex(ratioVals)
   const pivotValue = ratioVals[pivotIdx]
@@ -141,10 +140,8 @@ function calculateCriteria(
     let allPassed = true
 
     if (isPivot) {
-      // PIVOT: cek semua threshold terhadap material lain
       materials.forEach((targetMat, j) => {
         if (i === j) {
-          // Pivot terhadap dirinya sendiri: ratio harus 1
           const passed = Math.abs(ratioVals[i] - 1) < EPS
           if (!passed) allPassed = false
           checks.push({
@@ -155,7 +152,6 @@ function calculateCriteria(
             passed
           })
         } else {
-          // Cari threshold pivot (i) terhadap target (j)
           const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
           if (th) {
             const passed = ratioVals[j] >= th.min_ratio - EPS && ratioVals[j] <= th.max_ratio + EPS
@@ -168,7 +164,6 @@ function calculateCriteria(
               passed
             })
           } else {
-            // Tidak ada threshold, dianggap passed
             checks.push({
               targetIndex: j,
               minRatio: 0,
@@ -180,7 +175,6 @@ function calculateCriteria(
         }
       })
     } else {
-      // NON-PIVOT: otomatis TMS (tidak dicek)
       return {
         materialIndex: i,
         label: m.label,
@@ -190,7 +184,6 @@ function calculateCriteria(
       }
     }
 
-    // Status pivot: MS jika semua syarat terpenuhi
     const status = allPassed ? 'MS' : 'TMS'
 
     return {
@@ -213,6 +206,8 @@ export default function BatchOverfilledPage() {
   const [product, setProduct] = useState<BOProduct | null>(null)
   const [loadingProduct, setLoadingProduct] = useState(false)
   const [loadingLatest, setLoadingLatest] = useState(false)
+
+  const [savedReport, setSavedReport] = useState<BOReport | null>(null)
 
   const [latestReport, setLatestReport] = useState<BOReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -284,7 +279,6 @@ export default function BatchOverfilledPage() {
     ? findPivotIndex(ratio as number[]) 
     : -1
   
-  // Ambil pivot result dari criteriaResults berdasarkan pivotIndex
   const pivotResult = pivotIndex >= 0 ? criteriaResults[pivotIndex] : undefined
   const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
   
@@ -293,10 +287,7 @@ export default function BatchOverfilledPage() {
 
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
-    if (!targetKode) {
-      console.warn('⚠️ No kode selected for history')
-      return
-    }
+    if (!targetKode) return
     
     setLoadingHistory(true)
     try {
@@ -309,18 +300,9 @@ export default function BatchOverfilledPage() {
         params.no_batch = currentFilter
       }
       
-      console.log(`📡 Fetching history for: ${targetKode}`, params)
-      
       const res = await api.get<BOReport[]>(`/batch-overfilled/reports/product/${targetKode}`, {
         params
       })
-      
-      console.log(`History loaded: ${res.data?.length || 0} items`)
-      
-      if (params.no_batch) {
-        console.log(`📊 Filtered by batch: ${params.no_batch}`)
-        console.log(`📊 Found ${res.data?.length || 0} records`)
-      }
       
       setHistoryData(res.data || [])
     } catch (err: any) {
@@ -333,7 +315,6 @@ export default function BatchOverfilledPage() {
 
   useEffect(() => {
     if (selectedKode && showHistory) {
-      console.log('🔄 Auto-refresh history due to filter change:', filterNoBatch || 'all')
       loadHistory(selectedKode)
     }
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
@@ -342,6 +323,7 @@ export default function BatchOverfilledPage() {
     setSelectedKode(kode)
     setProduct(null)
     setLatestReport(null)
+    setSavedReport(null)  
     setInputRaws([])
     setBobotTotalRaw('')
     setNoBatch('')
@@ -457,6 +439,7 @@ export default function BatchOverfilledPage() {
       const response = await api.post<BOReport>('/batch-overfilled/reports', payload)
       
       setLatestReport(response.data)
+      setSavedReport(response.data)  
       setHistoryData(prev => [response.data, ...prev])
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 4000)
@@ -469,8 +452,15 @@ export default function BatchOverfilledPage() {
     }
   }
 
+  const isExportable = !!savedReport && savedReport.no_batch === noBatch.trim() && allFilled
+
   function handleExportPDF() {
     if (!product || !allFilled || nilaiTertinggi == null || bobotTotal == null) return
+    
+    if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
+      setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
+      return
+    }
     
     const createdBy = user?.full_name || user?.username || 'User'
     const dateStr = formatDateForFilename(tglPembuatan)
@@ -739,7 +729,6 @@ export default function BatchOverfilledPage() {
         <div className="mb-4 flex justify-end gap-3">
           <button
             onClick={() => {
-              console.log('📊 Opening history modal...')
               loadHistory()
               setShowHistory(true)
             }}
@@ -794,17 +783,24 @@ export default function BatchOverfilledPage() {
                           inputMode="decimal"
                           placeholder="0"
                           value={inputRaws[i] ?? ''}
-                          onChange={e => setInputRaws(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
+                          onChange={e => {
+                            setInputRaws(prev => prev.map((v, idx) => idx === i ? e.target.value : v))
+                            if (savedReport) setSavedReport(null)
+                          }}
                           className={greenInput}
                         />
                       </td>
                     ))}
                     <td className="px-3 py-2">
-                      <input                        type="text"
+                      <input
+                        type="text"
                         inputMode="decimal"
                         placeholder="0"
                         value={bobotTotalRaw}
-                        onChange={e => setBobotTotalRaw(e.target.value)}
+                        onChange={e => {
+                          setBobotTotalRaw(e.target.value)
+                          if (savedReport) setSavedReport(null)
+                        }}
                         className={greenInput}
                       />
                     </td>
@@ -1002,7 +998,10 @@ export default function BatchOverfilledPage() {
                 <input
                   type="text"
                   value={noBatch}
-                  onChange={e => setNoBatch(e.target.value)}
+                  onChange={e => {
+                    setNoBatch(e.target.value)
+                    if (savedReport) setSavedReport(null)
+                  }}
                   placeholder="Contoh: BATCH-001"
                   className={inputBase}
                 />
@@ -1017,7 +1016,7 @@ export default function BatchOverfilledPage() {
                   disabled  
                   className={cn(inputBase, 'opacity-60 cursor-not-allowed')}
                 />
-                <p className="text-xs text-gray-400 mt-1">✅ Otomatis tanggal hari ini</p>
+                <p className="text-xs text-gray-400 mt-1">Otomatis tanggal hari ini</p>
               </div>
               <div>
                 <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
@@ -1067,7 +1066,8 @@ export default function BatchOverfilledPage() {
 
               <button
                 onClick={handleExportPDF}
-                disabled={!allFilled || !product}
+                disabled={!isExportable}
+                title={!isExportable ? '⚠️ Simpan laporan terlebih dahulu sebelum export PDF' : 'Export PDF'}
                 className={cn(
                   'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -1078,6 +1078,12 @@ export default function BatchOverfilledPage() {
                 Export PDF
               </button>
             </div>
+
+            {!savedReport && allFilled && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
+                ⚠️ Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF
+              </p>
+            )}
 
             <p className={cn('text-xs mt-3 font-mono', isDark ? 'text-gray-500' : 'text-gray-400')}>
               Calculation_Batch_Overfilled_{formatDateForFilename(tglPembuatan)}
@@ -1105,6 +1111,7 @@ export default function BatchOverfilledPage() {
                 setBobotTotalRaw(report.bobot_total?.toString() || '')
                 setNoBatch(report.no_batch || '')
                 setLatestReport(report)
+                setSavedReport(report) 
                 setShowHistory(false)
               } catch (e) {
                 console.error('Error parsing report detail:', e)
@@ -1113,11 +1120,9 @@ export default function BatchOverfilledPage() {
           }}
           filterNoBatch={filterNoBatch}
           onFilterChange={(value: string) => {
-            console.log('📊 Filter changed to:', value)
             setFilterNoBatch(value)
           }}
           onRefresh={() => {
-            console.log('🔄 Refreshing history...')
             loadHistory()
           }}
         />

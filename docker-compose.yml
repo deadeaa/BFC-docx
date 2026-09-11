@@ -24,6 +24,7 @@ services:
 
   # BACKEND (Go + Node.js di dalam 1 container)
   backend:
+    platform: linux/amd64   
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -49,6 +50,7 @@ services:
 
   # FRONTEND (React/Vite)
   frontend:
+    platform: linux/amd64
     build:
       context: ./frontend
       dockerfile: Dockerfile
