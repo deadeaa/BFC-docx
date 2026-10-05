@@ -12,7 +12,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const IDLE_LIMIT_MS = 12 * 60 * 60 * 1000 // 12 jam
+const IDLE_LIMIT_MS = 1 * 60 * 60 * 1000 // 12 jam
 const CHECK_INTERVAL_MS = 30 * 1000 // cek setiap 30 detik
 const LAST_ACTIVITY_KEY = 'bfc_last_activity'
 

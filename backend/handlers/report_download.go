@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"bfc-backend/audit"
+	"bfc-backend/middleware"
 	"bfc-backend/models"
 	"bfc-backend/repository"
 
@@ -25,6 +26,28 @@ type ReportDownloadHandler struct {
 
 func NewReportDownloadHandler(db *repository.DB) *ReportDownloadHandler {
 	return &ReportDownloadHandler{db: db}
+}
+
+func isAdminOrTS(c *gin.Context) bool {
+	role, exists := c.Get(middleware.CtxRole)
+	if !exists {
+		return false
+	}
+	roleStr, ok := role.(string)
+	if !ok {
+		return false
+	}
+	return roleStr == "admin" || roleStr == "ts"
+}
+
+func (h *ReportDownloadHandler) requireAdminOrTS(c *gin.Context) bool {
+	if !isAdminOrTS(c) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "Hanya Administrator dan Technical Support yang dapat mengunduh report",
+		})
+		return false
+	}
+	return true
 }
 
 func getKeys(m map[string]interface{}) []string {
@@ -254,14 +277,12 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 
 		qty := formatFloat2(m.QtyPerSachet)
 
-		// Dengan prefix bk_
 		data["bk_"+prefix+"range_min"] = rangeMin
 		data["bk_"+prefix+"range_max"] = rangeMax
 		data["bk_"+prefix+"kode"] = m.KodeMaterial
 		data["bk_"+prefix+"qty"] = qty
 		data["bk_"+prefix+"hasil"] = hasil
 
-		// Tanpa prefix
 		data[prefix+"range_min"] = rangeMin
 		data[prefix+"range_max"] = rangeMax
 		data[prefix+"kode"] = m.KodeMaterial
@@ -276,8 +297,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 			"range_max":      rangeMax,
 			"hasil":          hasil,
 		})
-
-		fmt.Printf("📊 BK Material %d: %s, Range Min: %.2f, Range Max: %.2f\n", idx, m.KodeMaterial, rangeMin, rangeMax)
 	}
 	data["materials"] = materialsData
 
@@ -287,9 +306,9 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 		total := formatFloat2((persen / 100) * report.BobotTotal)
 
 		rendemenData = append(rendemenData, map[string]interface{}{
-			"persen":      persen,
-			"total":       total,
-			"persentase":  persen,
+			"persen":     persen,
+			"total":      total,
+			"persentase": persen,
 		})
 
 		prefix := fmt.Sprintf("bk_rendemen_%d_", idx)
@@ -323,7 +342,6 @@ func (h *ReportDownloadHandler) prepareBKData(c *gin.Context, kodeProduk string,
 		data["bk_rendemen_4_persentase"] = rendemenData[4]["persentase"]
 	}
 
-	fmt.Printf("BK Data prepared: %d materials, %d rendemen\n", len(materialsData), len(rendemenData))
 	return data, nil
 }
 
@@ -339,7 +357,6 @@ func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string,
 
 	tanggalProduksi := report.TglPembuatan.Format("02-01-2006")
 
-	// Data umum
 	data["no_batch"] = report.NoBatch
 	data["tanggal_produksi"] = tanggalProduksi
 	data["tgl_pembuatan"] = tanggalProduksi
@@ -347,7 +364,6 @@ func (h *ReportDownloadHandler) prepareBOData(c *gin.Context, kodeProduk string,
 	data["kesimpulan"] = report.Kesimpulan
 	data["bobot_total"] = formatFloat2(report.BobotTotal)
 
-	// Dengan prefix bo_
 	data["bo_no_batch"] = report.NoBatch
 	data["bo_tanggal_produksi"] = tanggalProduksi
 	data["bo_tanggal"] = tanggalProduksi
@@ -560,11 +576,14 @@ type DownloadReportRequest struct {
 }
 
 func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
+	if !h.requireAdminOrTS(c) {
+		return
+	}
+
 	var req DownloadReportRequest
 	var err error
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Printf("❌ Invalid request: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak valid: " + err.Error()})
 		return
 	}
@@ -579,25 +598,20 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 
 	bkReport, err := h.db.GetBKReportByID(c, req.BKReportID)
 	if err != nil {
-		fmt.Printf("❌ BK Report not found: ID=%d, error=%v\n", req.BKReportID, err)
 		c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
 		return
 	}
-	fmt.Printf("BK Report found: %s\n", bkReport.NoBatch)
 
 	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
 	if err != nil {
-		fmt.Printf("❌ Template not found: %v\n", err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"message":   "Template DOCX untuk produk " + req.KodeProduk + " belum diupload admin",
 			"kode_prod": req.KodeProduk,
 		})
 		return
 	}
-	fmt.Printf("Template found: %s\n", template.FilePath)
 
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
-		fmt.Printf("❌ File not found: %s\n", template.FilePath)
 		c.JSON(http.StatusNotFound, gin.H{
 			"message":   "File template tidak ditemukan di server",
 			"file_path": template.FilePath,
@@ -607,7 +621,6 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 
 	data, err := h.prepareBKData(c, req.KodeProduk, bkReport)
 	if err != nil {
-		fmt.Printf("❌ Prepare BK data error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Gagal memproses data report",
 			"error":   err.Error(),
@@ -620,19 +633,14 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 	data["created_by"] = bkReport.CreatedByName
 	data["tanggal_download"] = time.Now().Format("02-01-2006 15:04:05")
 
-	fmt.Printf("📊 Total data keys: %d\n", len(data))
-
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
-		fmt.Printf("❌ Generate DOCX error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Gagal generate file report",
 			"error":   err.Error(),
 		})
 		return
 	}
-
-	fmt.Printf("DOCX generated, size: %d bytes\n", len(docxBytes))
 
 	filename := fmt.Sprintf("report_BK_%s_%s.docx", req.KodeProduk, bkReport.NoBatch)
 	c.Header("Content-Description", "File Transfer")
@@ -647,7 +655,6 @@ func (h *ReportDownloadHandler) DownloadReportByType(c *gin.Context) {
 	})
 }
 
-// DOWNLOAD GABUNGAN BO + BK
 type CombinedReportRequest struct {
 	KodeProduk string `json:"kode_produk" binding:"required"`
 	BOReportID int    `json:"bo_report_id"`
@@ -655,17 +662,17 @@ type CombinedReportRequest struct {
 }
 
 func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
+	if !h.requireAdminOrTS(c) {
+		return
+	}
+
 	var req CombinedReportRequest
 	var err error
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Printf("❌ Invalid request: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak valid: " + err.Error()})
 		return
 	}
-
-	fmt.Printf("📥 Downloading Combined Report - Produk: %s, BO_ID: %d, BK_ID: %d\n",
-		req.KodeProduk, req.BOReportID, req.BKReportID)
 
 	if req.BOReportID == 0 && req.BKReportID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Pilih minimal 1 report (BO atau BK)"})
@@ -676,37 +683,30 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 	if req.BOReportID > 0 {
 		boReport, err = h.db.GetBOReportByID(c, req.BOReportID)
 		if err != nil {
-			fmt.Printf("❌ BO Report not found: ID=%d\n", req.BOReportID)
 			c.JSON(http.StatusNotFound, gin.H{"message": "BO Report tidak ditemukan"})
 			return
 		}
-		fmt.Printf("BO Report found: %s\n", boReport.NoBatch)
 	}
 
 	var bkReport *models.BKReport
 	if req.BKReportID > 0 {
 		bkReport, err = h.db.GetBKReportByID(c, req.BKReportID)
 		if err != nil {
-			fmt.Printf("❌ BK Report not found: ID=%d\n", req.BKReportID)
 			c.JSON(http.StatusNotFound, gin.H{"message": "BK Report tidak ditemukan"})
 			return
 		}
-		fmt.Printf("BK Report found: %s\n", bkReport.NoBatch)
 	}
 
 	template, err := h.db.GetReportTemplate(c, req.KodeProduk)
 	if err != nil {
-		fmt.Printf("❌ Template not found: %v\n", err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"message":   "Template DOCX untuk produk " + req.KodeProduk + " belum diupload admin",
 			"kode_prod": req.KodeProduk,
 		})
 		return
 	}
-	fmt.Printf("Template found: %s\n", template.FilePath)
 
 	if _, err := os.Stat(template.FilePath); os.IsNotExist(err) {
-		fmt.Printf("❌ File not found: %s\n", template.FilePath)
 		c.JSON(http.StatusNotFound, gin.H{
 			"message":   "File template tidak ditemukan di server",
 			"file_path": template.FilePath,
@@ -772,19 +772,14 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 		data["bk_input_sisa_minor"] = 0
 	}
 
-	fmt.Printf("📊 Total data keys: %d\n", len(data))
-
 	docxBytes, err := h.generateDocxViaNode(template.FilePath, data)
 	if err != nil {
-		fmt.Printf("❌ Generate DOCX error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Gagal generate file report",
 			"error":   err.Error(),
 		})
 		return
 	}
-
-	fmt.Printf("DOCX generated, size: %d bytes\n", len(docxBytes))
 
 	filename := fmt.Sprintf("report_combined_%s.docx", req.KodeProduk)
 	c.Header("Content-Description", "File Transfer")
@@ -799,8 +794,11 @@ func (h *ReportDownloadHandler) DownloadCombinedReport(c *gin.Context) {
 	})
 }
 
-// DOWNLOAD INDIVIDUAL (BO atau BK)
 func (h *ReportDownloadHandler) DownloadReport(c *gin.Context) {
+	if !h.requireAdminOrTS(c) {
+		return
+	}
+
 	reportID, err := strconv.Atoi(c.Param("reportId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FileDown, ChevronDown, AlertCircle, CheckCircle2, FileText, Tag } from 'lucide-react'
+import { FileDown, ChevronDown, AlertCircle, CheckCircle2, FileText, Tag, ShieldAlert } from 'lucide-react'
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 import { cn } from '../../lib/utils'
 
 interface ProductOption {
@@ -27,6 +28,9 @@ interface BKReport extends BaseReport {
 export default function DownloadReportPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { user } = useAuth()
+
+  const canAccess = user?.role === 'admin' || user?.role === 'ts'
 
   const [products, setProducts] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
@@ -41,6 +45,8 @@ export default function DownloadReportPage() {
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
+    if (!canAccess) return
+
     api.get('/batch-khusus/products')
       .then((res) => {
         const data = res.data || []
@@ -50,20 +56,18 @@ export default function DownloadReportPage() {
         setProducts(unique)
       })
       .catch(() => {})
-  }, [])
+  }, [canAccess])
 
   const filteredProducts = products.filter((p) => {
     const kode = p.kode_produk.toUpperCase()
     
     if (jenisProduk === 'ruah') {
-      // Kode produk ruah: PEBJ3, PEBJ4, PBSJ1, dll (dimulai dengan P atau B)
       return kode.startsWith('P') || kode.startsWith('B')
     } else if (jenisProduk === 'minor') {
-      // Kode produk minor: XEBJ3, XEBJ4, XBSJ1, dll (dimulai dengan X)
       return kode.startsWith('X')
     }
     
-    return true 
+    return true
   })
 
   const loadBKReports = useCallback(async (kode: string) => {
@@ -120,7 +124,6 @@ export default function DownloadReportPage() {
     
     try {
       let date: Date
-      
       date = new Date(dateStr)
       
       if (isNaN(date.getTime())) {
@@ -139,9 +142,7 @@ export default function DownloadReportPage() {
         }
       }
       
-      if (isNaN(date.getTime())) {
-        return dateStr
-      }
+      if (isNaN(date.getTime())) return dateStr
       
       return date.toLocaleDateString('id-ID', {
         day: '2-digit',
@@ -223,6 +224,28 @@ export default function DownloadReportPage() {
       )}>
         {type}
       </span>
+    )
+  }
+
+  if (!canAccess) {
+    return (
+      <div className={cn('min-h-full p-6 flex items-center justify-center', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
+        <div className={cn('rounded-xl p-8 shadow-sm max-w-md text-center', 
+          isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+        )}>
+          <div className="flex justify-center mb-4">
+            <div className="p-3 rounded-full bg-red-500/10">
+              <ShieldAlert size={40} className="text-red-500" />
+            </div>
+          </div>
+          <h1 className={cn('text-xl font-bold mb-2', isDark ? 'text-white' : 'text-gray-900')}>
+            Akses Ditolak
+          </h1>
+          <p className={cn('text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>
+            Halaman <b>Download Report</b> hanya dapat diakses oleh <b>Administrator</b> dan <b>Technical Support</b>.
+          </p>
+        </div>
+      </div>
     )
   }
 

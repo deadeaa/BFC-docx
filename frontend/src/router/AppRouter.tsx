@@ -37,9 +37,8 @@ export default function AppRouter() {
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/" element={<Navigate to="/welcome" replace />} />
 
-              <Route path="/500" element={<Error500 />} />
-              <Route path="/503" element={<Error503 />} />
-              <Route path="*" element={<Error404 />} />
+            <Route path="/500" element={<Error500 />} />
+            <Route path="/503" element={<Error503 />} />
 
             <Route
               path="/welcome"
@@ -72,7 +71,7 @@ export default function AppRouter() {
                 </RequireAuth>
               }
             />
-            
+
             <Route
               path="/perhitungan/batch-overfilled"
               element={
@@ -129,7 +128,7 @@ export default function AppRouter() {
             <Route
               path="/download-report"
               element={
-                <RequireAuth roles={['admin', 'produksi', 'qa', 'ts', 'ppic']}>
+                <RequireAuth roles={['admin', 'ts']}>
                   <Layout>
                     <DownloadReportPage />
                   </Layout>
@@ -168,7 +167,7 @@ export default function AppRouter() {
               }
             />
 
-            <Route path="*" element={<Navigate to="/welcome" replace />} />
+            <Route path="*" element={<Error404 />} />
           </Routes>
         </AuthProvider>
       </ThemeProvider>

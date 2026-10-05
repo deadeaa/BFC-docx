@@ -17,7 +17,7 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
-import b7LogoWhite from '../../assets/B7-logo-white.png'
+import b7LogoWhite from '../assets/B7-logo-white.png'
 
 const calcItems = [
   { name: 'Batch Overfilled', path: '/perhitungan/batch-overfilled' },
@@ -66,6 +66,8 @@ export default function Sidebar() {
   const canCalc = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
   const canReport = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
   const isAdmin = hasRole('admin', 'ts')
+
+  const canDownloadReport = hasRole('admin', 'ts')
 
   const toggleCalc = () => {
     const next = !calcOpen
@@ -224,7 +226,7 @@ export default function Sidebar() {
           </div>
         )}
 
-        {canReport && (
+        {canDownloadReport && (
           <div>
             {collapsed ? (
               <TooltipLink item={{ name: 'Download Report', path: '/download-report' }} icon={<FileDown size={20} />} />

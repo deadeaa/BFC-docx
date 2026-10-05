@@ -49,7 +49,7 @@ func main() {
 	r := gin.Default()
 
 	r.Use(middleware.ErrorHandler())
-	r.MaxMultipartMemory = 20 << 30 // 20 MB
+	r.MaxMultipartMemory = 20 << 20 // 20 MB
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -90,10 +90,6 @@ func main() {
 		protected.GET("/batch-overfilled/reports/product/:kode", boHandler.GetProductReports)
 		protected.GET("/batch-overfilled/reports/latest/:kode", boHandler.GetLatestReport)
 
-		protected.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
-		protected.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
-		protected.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
-
 		calcGroup := protected.Group("", middleware.RequireRole("admin", "ts", "produksi", "qa", "ppic"))
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
@@ -102,6 +98,10 @@ func main() {
 
 		adminGroup := protected.Group("", middleware.AdminOrTSOnly())
 		{
+			adminGroup.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
+			adminGroup.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
+			adminGroup.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
+
 			adminGroup.GET("/users", userHandler.List)
 			adminGroup.POST("/users", userHandler.Create)
 			adminGroup.PUT("/users/:id", userHandler.Update)
