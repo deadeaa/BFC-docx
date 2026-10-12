@@ -17,7 +17,7 @@ import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 
-import b7LogoWhite from '../assets/B7-logo-white.png'
+import b7LogoWhite from '../../assets/B7-logo-white.png'
 
 const calcItems = [
   { name: 'Batch Overfilled', path: '/perhitungan/batch-overfilled' },
