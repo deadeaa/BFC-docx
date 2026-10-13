@@ -1,18 +1,10 @@
 # frontend/Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-RUN npm run build
-
 FROM nginx:alpine
 
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Langsung copy hasil build dari laptop
+COPY ./dist /usr/share/nginx/html
 
+# Konfigurasi Nginx & Reverse Proxy ke Backend
 RUN echo 'client_max_body_size 20M; \
     server { \
         listen 80; \

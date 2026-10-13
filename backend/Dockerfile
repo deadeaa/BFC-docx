@@ -3,30 +3,23 @@ FROM golang:1.22-alpine AS go-builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
-
+# Copy seluruh source code termasuk folder vendor
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bfc-backend main.go
+# Build Go secara offline dari folder vendor
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -ldflags="-s -w" -o bfc-backend main.go
 
-FROM node:18-alpine AS node-builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates nodejs npm
+# FINAL STAGE: Langsung gunakan node:18-alpine (Node.js sudah ada bawaan, tidak perlu apk add!)
+FROM node:18-alpine
 
 WORKDIR /root/
 
+# Copy binary Go hasil build
 COPY --from=go-builder /app/bfc-backend .
 
-COPY --from=node-builder /app/node_modules ./node_modules
+# Copy source code backend & node_modules
 COPY index.js .
+COPY node_modules ./node_modules
 
 RUN mkdir -p uploads/templates
 
