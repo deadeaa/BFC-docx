@@ -40,6 +40,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		FullName string      `json:"full_name" binding:"required"`
 		Password string      `json:"password" binding:"required,min=6"`
 		Role     models.Role `json:"role" binding:"required"`
+		Jabatan  string      `json:"jabatan"`
 		IsActive *bool       `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,6 +64,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		FullName: req.FullName,
 		Password: string(hashed),
 		Role:     req.Role,
+		Jabatan:  req.Jabatan,
 		IsActive: isActive,
 	})
 	if err != nil {
@@ -91,6 +93,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		FullName string      `json:"full_name"`
 		Password string      `json:"password"`
 		Role     models.Role `json:"role"`
+		Jabatan  *string     `json:"jabatan"`
 		IsActive *bool       `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -107,6 +110,9 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 	if req.Role != "" {
 		fields["role"] = req.Role
+	}
+	if req.Jabatan != nil {
+		fields["jabatan"] = *req.Jabatan
 	}
 	if req.IsActive != nil {
 		fields["is_active"] = *req.IsActive

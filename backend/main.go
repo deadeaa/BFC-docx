@@ -81,8 +81,10 @@ func main() {
 		protected.GET("/batch-khusus/products", bkHandler.ListProducts)
 		protected.GET("/batch-khusus/products/:kode", bkHandler.GetProduct)
 		protected.GET("/batch-khusus/reports", bkHandler.ListReports)
+		protected.GET("/batch-khusus/reports/single/:id", bkHandler.GetReport)
 		protected.GET("/batch-khusus/reports/product/:kode", bkHandler.GetProductReports)
 		protected.GET("/batch-khusus/reports/latest/:kode", bkHandler.GetLatestReport)
+		protected.GET("/batch-khusus/notifications", bkHandler.GetNotifications)
 
 		protected.GET("/batch-overfilled/products", boHandler.ListProducts)
 		protected.GET("/batch-overfilled/products/:kode", boHandler.GetProduct)
@@ -93,6 +95,10 @@ func main() {
 		calcGroup := protected.Group("", middleware.RequireRole("admin", "ts", "produksi", "qa", "ppic"))
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
+			calcGroup.PUT("/batch-khusus/reports/:id", bkHandler.UpdateReport)
+			calcGroup.POST("/batch-khusus/reports/:id/submit", bkHandler.SubmitReport)
+			calcGroup.POST("/batch-khusus/reports/:id/approve", bkHandler.ApproveReport)
+			calcGroup.POST("/batch-khusus/reports/:id/reject", bkHandler.RejectReport)
 			calcGroup.POST("/batch-overfilled/reports", boHandler.CreateReport)
 		}
 

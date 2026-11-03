@@ -18,6 +18,7 @@ type Claims struct {
 	UserID   int    `json:"user_id"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+	Jabatan  string `json:"jabatan"`
 	jwt.RegisteredClaims
 }
 
@@ -29,11 +30,12 @@ func NewService(secret string) *Service {
 	return &Service{secret: []byte(secret)}
 }
 
-func (s *Service) GenerateAccessToken(userID int, username, role string) (string, error) {
+func (s *Service) GenerateAccessToken(userID int, username, role, jabatan string) (string, error) {
 	claims := Claims{
 		UserID:   userID,
 		Username: username,
 		Role:     role,
+		Jabatan:  jabatan,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

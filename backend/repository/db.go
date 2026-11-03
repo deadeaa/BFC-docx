@@ -31,9 +31,9 @@ func New(connStr string) (*DB, error) {
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, username, full_name, password, role, is_active, created_at, updated_at
+		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, created_at, updated_at
 		 FROM users WHERE username = $1`, username).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -43,9 +43,9 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, username, full_name, password, role, is_active, created_at, updated_at
+		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, created_at, updated_at
 		 FROM users WHERE id = $1`, id).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 
 func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := db.pool.Query(ctx,
-		`SELECT id, username, full_name, role, is_active, created_at, updated_at FROM users ORDER BY id`)
+		`SELECT id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at FROM users ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -74,11 +74,11 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 func (db *DB) CreateUser(ctx context.Context, u *models.User) (*models.User, error) {
 	created := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`INSERT INTO users (username, full_name, password, role, is_active)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, username, full_name, role, is_active, created_at, updated_at`,
-		u.Username, u.FullName, u.Password, u.Role, u.IsActive).
-		Scan(&created.ID, &created.Username, &created.FullName, &created.Role, &created.IsActive, &created.CreatedAt, &created.UpdatedAt)
+		`INSERT INTO users (username, full_name, password, role, jabatan, is_active)
+		 VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6)
+		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at`,
+		u.Username, u.FullName, u.Password, u.Role, u.Jabatan, u.IsActive).
+		Scan(&created.ID, &created.Username, &created.FullName, &created.Role, &created.Jabatan, &created.IsActive, &created.CreatedAt, &created.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -101,12 +101,12 @@ func (db *DB) UpdateUser(ctx context.Context, id int, fields map[string]interfac
 
 	query := fmt.Sprintf(
 		`UPDATE users SET %s WHERE id = $%d
-		 RETURNING id, username, full_name, role, is_active, created_at, updated_at`,
+		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at`,
 		strings.Join(setClauses, ", "), i)
 
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx, query, args...).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -289,10 +289,13 @@ CREATE TABLE IF NOT EXISTS users (
 	full_name  VARCHAR(200) NOT NULL,
 	password   VARCHAR(255) NOT NULL,
 	role       VARCHAR(50)  NOT NULL CHECK (role IN ('admin','produksi','qa', 'ts', 'ppic')),
+	jabatan    VARCHAR(20)  DEFAULT NULL,
 	is_active  BOOLEAN      NOT NULL DEFAULT true,
 	created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 	updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS jabatan VARCHAR(20) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS sessions (
 	id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -394,9 +397,35 @@ CREATE TABLE IF NOT EXISTS bk_reports (
     input_sisa_minor NUMERIC(12,4) NOT NULL,
     detail_json      TEXT,
     created_by       INT           NOT NULL REFERENCES users(id),
-    created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    status           VARCHAR(20)   NOT NULL DEFAULT 'draft',
+    spv_id           INT           REFERENCES users(id),
+    spv_name         VARCHAR(200),
+    spv_approved_at  TIMESTAMPTZ,
+    mgr_id           INT           REFERENCES users(id),
+    mgr_name         VARCHAR(200),
+    mgr_approved_at  TIMESTAMPTZ,
+    rejected_by      INT           REFERENCES users(id),
+    rejected_by_name VARCHAR(200),
+    rejected_at      TIMESTAMPTZ,
+    reject_note      TEXT,
+    updated_at       TIMESTAMPTZ   DEFAULT NOW()
 );
 
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft';
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS spv_id INT REFERENCES users(id);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS spv_name VARCHAR(200);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS spv_approved_at TIMESTAMPTZ;
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS mgr_id INT REFERENCES users(id);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS mgr_name VARCHAR(200);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS mgr_approved_at TIMESTAMPTZ;
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS rejected_by INT REFERENCES users(id);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS rejected_by_name VARCHAR(200);
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ;
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS reject_note TEXT;
+ALTER TABLE bk_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_bk_reports_status ON bk_reports(status);
 CREATE INDEX IF NOT EXISTS idx_bk_reports_kode  ON bk_reports(kode_produk);
 CREATE INDEX IF NOT EXISTS idx_bk_reports_tgl   ON bk_reports(tgl_pembuatan DESC);
 CREATE INDEX IF NOT EXISTS idx_bk_materials_pid ON bk_product_materials(product_id);
@@ -867,24 +896,34 @@ func (db *DB) GetBKProduct(ctx context.Context, kodeProduk string) (*models.BKPr
 }
 
 func (db *DB) CreateBKReport(ctx context.Context, r *models.BKReport) (*models.BKReport, error) {
+	if r.Status == "" {
+		r.Status = "draft"
+	}
 	err := db.pool.QueryRow(ctx,
-		`INSERT INTO bk_reports (kode_produk, no_batch, tgl_pembuatan, bobot_total, input_sisa_minor, detail_json, created_by)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, created_at`,
-		r.KodeProduk, r.NoBatch, r.TglPembuatan, r.BobotTotal, r.InputSisaMinor, r.DetailJSON, r.CreatedBy,
-	).Scan(&r.ID, &r.CreatedAt)
+		`INSERT INTO bk_reports (kode_produk, no_batch, tgl_pembuatan, bobot_total, input_sisa_minor, detail_json, created_by, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, created_at, status`,
+		r.KodeProduk, r.NoBatch, r.TglPembuatan, r.BobotTotal, r.InputSisaMinor, r.DetailJSON, r.CreatedBy, r.Status,
+	).Scan(&r.ID, &r.CreatedAt, &r.Status)
 	if err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 
-func (db *DB) ListBKReports(ctx context.Context, search string, page, pageSize int) ([]models.BKReport, int, error) {
+func (db *DB) ListBKReports(ctx context.Context, search, status string, page, pageSize int) ([]models.BKReport, int, error) {
 	where := "1=1"
 	args := []interface{}{}
+	argIdx := 1
 	if search != "" {
-		where = "(r.kode_produk ILIKE $1 OR p.nama_produk ILIKE $1 OR r.no_batch ILIKE $1)"
+		where += fmt.Sprintf(" AND (r.kode_produk ILIKE $%d OR p.nama_produk ILIKE $%d OR r.no_batch ILIKE $%d)", argIdx, argIdx, argIdx)
 		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	if status != "" && status != "all" {
+		where += fmt.Sprintf(" AND LOWER(r.status) = LOWER($%d)", argIdx)
+		args = append(args, status)
+		argIdx++
 	}
 
 	var total int
@@ -905,11 +944,17 @@ func (db *DB) ListBKReports(ctx context.Context, search string, page, pageSize i
 	}
 	offset := (page - 1) * pageSize
 
-	limitArg := len(args) + 1
-	offsetArg := len(args) + 2
+	limitArg := argIdx
+	offsetArg := argIdx + 1
 	query := fmt.Sprintf(
 		`SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch, r.tgl_pembuatan,
-		        r.bobot_total, r.input_sisa_minor, r.created_by, COALESCE(u.full_name,''), r.created_at
+		        r.bobot_total, r.input_sisa_minor, COALESCE(r.detail_json, ''),
+		        r.created_by, COALESCE(u.full_name,''), r.created_at,
+		        COALESCE(r.status, 'draft'),
+		        r.spv_id, COALESCE(r.spv_name, ''), r.spv_approved_at,
+		        r.mgr_id, COALESCE(r.mgr_name, ''), r.mgr_approved_at,
+		        r.rejected_by, COALESCE(r.rejected_by_name, ''), r.rejected_at,
+		        COALESCE(r.reject_note, ''), r.updated_at
 		 FROM bk_reports r
 		 LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
 		 LEFT JOIN users u ON u.id = r.created_by
@@ -928,7 +973,13 @@ func (db *DB) ListBKReports(ctx context.Context, search string, page, pageSize i
 		var rep models.BKReport
 		if err := rows.Scan(
 			&rep.ID, &rep.KodeProduk, &rep.NamaProduk, &rep.NoBatch, &rep.TglPembuatan,
-			&rep.BobotTotal, &rep.InputSisaMinor, &rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+			&rep.BobotTotal, &rep.InputSisaMinor, &rep.DetailJSON,
+			&rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+			&rep.Status,
+			&rep.SPVID, &rep.SPVName, &rep.SPVApprovedAt,
+			&rep.MGRID, &rep.MGRName, &rep.MGRApprovedAt,
+			&rep.RejectedBy, &rep.RejectedByName, &rep.RejectedAt,
+			&rep.RejectNote, &rep.UpdatedAt,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -940,14 +991,127 @@ func (db *DB) ListBKReports(ctx context.Context, search string, page, pageSize i
 func (db *DB) GetBKReportByID(ctx context.Context, id int) (*models.BKReport, error) {
 	rep := &models.BKReport{}
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, kode_produk, no_batch, tgl_pembuatan, bobot_total, input_sisa_minor, created_by, created_at
-		 FROM bk_reports WHERE id = $1`, id).
-		Scan(&rep.ID, &rep.KodeProduk, &rep.NoBatch, &rep.TglPembuatan, &rep.BobotTotal,
-			&rep.InputSisaMinor, &rep.CreatedBy, &rep.CreatedAt)
+		`SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch, r.tgl_pembuatan,
+		        r.bobot_total, r.input_sisa_minor, COALESCE(r.detail_json, ''),
+		        r.created_by, COALESCE(u.full_name,''), r.created_at,
+		        COALESCE(r.status, 'draft'),
+		        r.spv_id, COALESCE(r.spv_name, ''), r.spv_approved_at,
+		        r.mgr_id, COALESCE(r.mgr_name, ''), r.mgr_approved_at,
+		        r.rejected_by, COALESCE(r.rejected_by_name, ''), r.rejected_at,
+		        COALESCE(r.reject_note, ''), r.updated_at
+		 FROM bk_reports r
+		 LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
+		 LEFT JOIN users u ON u.id = r.created_by
+		 WHERE r.id = $1`, id).
+		Scan(
+			&rep.ID, &rep.KodeProduk, &rep.NamaProduk, &rep.NoBatch, &rep.TglPembuatan,
+			&rep.BobotTotal, &rep.InputSisaMinor, &rep.DetailJSON,
+			&rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+			&rep.Status,
+			&rep.SPVID, &rep.SPVName, &rep.SPVApprovedAt,
+			&rep.MGRID, &rep.MGRName, &rep.MGRApprovedAt,
+			&rep.RejectedBy, &rep.RejectedByName, &rep.RejectedAt,
+			&rep.RejectNote, &rep.UpdatedAt,
+		)
 	if err != nil {
 		return nil, err
 	}
 	return rep, nil
+}
+
+func (db *DB) UpdateBKReportCalculation(ctx context.Context, id int, bobotTotal, inputSisaMinor float64, detailJSON string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports 
+		 SET bobot_total = $1, input_sisa_minor = $2, detail_json = $3, updated_at = NOW() 
+		 WHERE id = $4`,
+		bobotTotal, inputSisaMinor, detailJSON, id)
+	return err
+}
+
+func (db *DB) SubmitBKReportForApproval(ctx context.Context, id int) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports 
+		 SET status = 'waiting_spv', reject_note = '', updated_at = NOW() 
+		 WHERE id = $1`, id)
+	return err
+}
+
+func (db *DB) ApproveBKReportBySPV(ctx context.Context, id int, spvID int, spvName string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports 
+		 SET status = 'waiting_mgr', spv_id = $1, spv_name = $2, spv_approved_at = NOW(), reject_note = '', updated_at = NOW() 
+		 WHERE id = $3`, spvID, spvName, id)
+	return err
+}
+
+func (db *DB) ApproveBKReportByMGR(ctx context.Context, id int, mgrID int, mgrName string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports 
+		 SET status = 'approved', mgr_id = $1, mgr_name = $2, mgr_approved_at = NOW(), reject_note = '', updated_at = NOW() 
+		 WHERE id = $3`, mgrID, mgrName, id)
+	return err
+}
+
+func (db *DB) RejectBKReport(ctx context.Context, id int, rejectedBy int, rejectedByName, rejectNote string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports 
+		 SET status = 'rejected', rejected_by = $1, rejected_by_name = $2, rejected_at = NOW(), reject_note = $3, updated_at = NOW() 
+		 WHERE id = $4`, rejectedBy, rejectedByName, rejectNote, id)
+	return err
+}
+
+func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan string) (*models.NotificationResponse, error) {
+	var whereClause string
+	if role == "admin" {
+		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr')"
+	} else if jabatan == "spv" {
+		whereClause = "r.status = 'waiting_spv'"
+	} else if jabatan == "mgr" {
+		whereClause = "r.status = 'waiting_mgr'"
+	} else {
+		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr', 'rejected', 'approved')"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch,
+		       COALESCE(u.full_name,''), r.created_at, COALESCE(r.status, 'draft'), r.updated_at, COALESCE(r.reject_note, '')
+		FROM bk_reports r
+		LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
+		LEFT JOIN users u ON u.id = r.created_by
+		WHERE %s
+		ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+		LIMIT 20
+	`, whereClause)
+
+	rows, err := db.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.ApprovalNotificationItem{}
+	pendingCount := 0
+	for rows.Next() {
+		var it models.ApprovalNotificationItem
+		if err := rows.Scan(
+			&it.ID, &it.KodeProduk, &it.NamaProduk, &it.NoBatch,
+			&it.CreatedByName, &it.CreatedAt, &it.Status, &it.UpdatedAt, &it.RejectNote,
+		); err != nil {
+			return nil, err
+		}
+		if (jabatan == "spv" && it.Status == "waiting_spv") ||
+		   (jabatan == "mgr" && it.Status == "waiting_mgr") ||
+		   (role == "admin" && (it.Status == "waiting_spv" || it.Status == "waiting_mgr")) ||
+		   (jabatan == "staff" && it.Status == "rejected") {
+			pendingCount++
+		}
+		items = append(items, it)
+	}
+
+	return &models.NotificationResponse{
+		PendingCount: pendingCount,
+		Items:        items,
+	}, nil
 }
 
 func (db *DB) DeleteBKReport(ctx context.Context, id int) error {
@@ -1502,10 +1666,15 @@ func (db *DB) GetLatestBKReportByProduct(ctx context.Context, kodeProduk string)
 	rep := &models.BKReport{}
 	err := db.pool.QueryRow(ctx,
 		`SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch, r.tgl_pembuatan,
-		        r.bobot_total, r.input_sisa_minor, 
+		        r.bobot_total, r.input_sisa_minor, COALESCE(r.detail_json, ''),
 		        COALESCE(r.created_by, 0) as created_by, 
 		        COALESCE(u.full_name,'') as created_by_name, 
-		        r.created_at
+		        r.created_at,
+		        COALESCE(r.status, 'draft'),
+		        r.spv_id, COALESCE(r.spv_name, ''), r.spv_approved_at,
+		        r.mgr_id, COALESCE(r.mgr_name, ''), r.mgr_approved_at,
+		        r.rejected_by, COALESCE(r.rejected_by_name, ''), r.rejected_at,
+		        COALESCE(r.reject_note, ''), r.updated_at
 		 FROM bk_reports r
 		 LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
 		 LEFT JOIN users u ON u.id = r.created_by
@@ -1514,7 +1683,13 @@ func (db *DB) GetLatestBKReportByProduct(ctx context.Context, kodeProduk string)
 		 LIMIT 1`,
 		kodeProduk).Scan(
 		&rep.ID, &rep.KodeProduk, &rep.NamaProduk, &rep.NoBatch, &rep.TglPembuatan,
-		&rep.BobotTotal, &rep.InputSisaMinor, &rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+		&rep.BobotTotal, &rep.InputSisaMinor, &rep.DetailJSON,
+		&rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+		&rep.Status,
+		&rep.SPVID, &rep.SPVName, &rep.SPVApprovedAt,
+		&rep.MGRID, &rep.MGRName, &rep.MGRApprovedAt,
+		&rep.RejectedBy, &rep.RejectedByName, &rep.RejectedAt,
+		&rep.RejectNote, &rep.UpdatedAt,
 	)
 	if err != nil {
 		log.Printf("❌ Query error: %v", err)
@@ -1530,10 +1705,15 @@ func (db *DB) ListBKReportsByProduct(ctx context.Context, kodeProduk string, noB
 
 	query := `
 		SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch, r.tgl_pembuatan,
-		        r.bobot_total, r.input_sisa_minor, 
+		        r.bobot_total, r.input_sisa_minor, COALESCE(r.detail_json, ''),
 		        COALESCE(r.created_by, 0) as created_by, 
 		        COALESCE(u.full_name,'') as created_by_name, 
-		        r.created_at
+		        r.created_at,
+		        COALESCE(r.status, 'draft'),
+		        r.spv_id, COALESCE(r.spv_name, ''), r.spv_approved_at,
+		        r.mgr_id, COALESCE(r.mgr_name, ''), r.mgr_approved_at,
+		        r.rejected_by, COALESCE(r.rejected_by_name, ''), r.rejected_at,
+		        COALESCE(r.reject_note, ''), r.updated_at
 		FROM bk_reports r
 		LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
 		LEFT JOIN users u ON u.id = r.created_by
@@ -1562,7 +1742,13 @@ func (db *DB) ListBKReportsByProduct(ctx context.Context, kodeProduk string, noB
 		var rep models.BKReport
 		if err := rows.Scan(
 			&rep.ID, &rep.KodeProduk, &rep.NamaProduk, &rep.NoBatch, &rep.TglPembuatan,
-			&rep.BobotTotal, &rep.InputSisaMinor, &rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+			&rep.BobotTotal, &rep.InputSisaMinor, &rep.DetailJSON,
+			&rep.CreatedBy, &rep.CreatedByName, &rep.CreatedAt,
+			&rep.Status,
+			&rep.SPVID, &rep.SPVName, &rep.SPVApprovedAt,
+			&rep.MGRID, &rep.MGRName, &rep.MGRApprovedAt,
+			&rep.RejectedBy, &rep.RejectedByName, &rep.RejectedAt,
+			&rep.RejectNote, &rep.UpdatedAt,
 		); err != nil {
 			log.Printf("❌ Scan error: %v", err)
 			return nil, err

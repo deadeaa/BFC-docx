@@ -1,23 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FileBarChart, Search, RefreshCw, FileDown, Trash2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { FileBarChart, Search, RefreshCw, FileDown, Trash2, ChevronLeft, ChevronRight, CheckCircle2, Clock, CheckCheck, XCircle, Filter, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import api from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
-
-interface BKReport {
-  id: number
-  kode_produk: string
-  nama_produk: string
-  no_batch: string
-  tgl_pembuatan: string
-  bobot_total: number
-  input_sisa_minor: number
-  created_by: number
-  created_by_name: string
-  created_at: string
-}
+import type { BKReport, BKReportStatus } from '../../types'
+import { statusLabel } from '../../lib/roles'
 
 interface BKReportListResponse {
   data: BKReport[]
@@ -56,16 +45,23 @@ export default function ReportBatchKhususPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
 
   const [deleteTarget, setDeleteTarget] = useState<BKReport | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState('')
+  const [activeNote, setActiveNote] = useState<{ batch: string; note: string } | null>(null)
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
     try {
       const { data } = await api.get<BKReportListResponse>('/batch-khusus/reports', {
-        params: { page, page_size: PAGE_SIZE, search: search || undefined },
+        params: {
+          page,
+          page_size: PAGE_SIZE,
+          search: search || undefined,
+          status: filterStatus !== 'all' ? filterStatus : undefined,
+        },
       })
       setReports(data.data ?? [])
       setTotal(data.total ?? 0)
@@ -75,7 +71,7 @@ export default function ReportBatchKhususPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search])
+  }, [page, search, filterStatus])
 
   useEffect(() => {
     const t = setTimeout(fetchReports, 350)
@@ -84,7 +80,7 @@ export default function ReportBatchKhususPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search])
+  }, [search, filterStatus])
 
   useEffect(() => {
     if (!toast) return
@@ -121,9 +117,13 @@ export default function ReportBatchKhususPage() {
       'Kode Produk':    r.kode_produk,
       'Nama Produk':    r.nama_produk ?? '',
       'No. Batch':      r.no_batch ?? '',
+      'Status':         statusLabel(r.status),
       'Tgl Pembuatan':  fmtDateTime(r.created_at),
       'Bobot Total':    r.bobot_total,
       'Dibuat Oleh':    r.created_by_name ?? '',
+      'SPV (Pemeriksa)': r.spv_name ?? '',
+      'MGR (Penyetujui)': r.mgr_name ?? '',
+      'Catatan Tolak':  r.reject_note ?? '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(data)
@@ -133,14 +133,57 @@ export default function ReportBatchKhususPage() {
       { wch: 14 },  // Kode Produk
       { wch: 32 },  // Nama Produk
       { wch: 18 },  // No. Batch
+      { wch: 18 },  // Status
       { wch: 20 },  // Tgl Pembuatan
       { wch: 14 },  // Bobot Total
       { wch: 20 },  // Dibuat Oleh
+      { wch: 20 },  // SPV
+      { wch: 20 },  // MGR
+      { wch: 30 },  // Catatan Tolak
     ]
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Report Batch Khusus')
     XLSX.writeFile(wb, filename)
+  }
+
+  function renderStatusBadge(status?: BKReportStatus | string) {
+    switch (status) {
+      case 'approved':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">
+            <CheckCheck size={12} />
+            Disetujui
+          </span>
+        )
+      case 'waiting_mgr':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-semibold">
+            <Clock size={12} />
+            Menunggu Manager
+          </span>
+        )
+      case 'waiting_spv':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-semibold">
+            <Clock size={12} />
+            Menunggu SPV
+          </span>
+        )
+      case 'rejected':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold">
+            <XCircle size={12} />
+            Ditolak
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 font-semibold">
+            Draft
+          </span>
+        )
+    }
   }
 
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
@@ -181,18 +224,36 @@ export default function ReportBatchKhususPage() {
         </p>
       </div>
 
-      <div className={cn('rounded-xl p-4 mb-5 shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between', card)}>
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Cari kode produk, nama produk, atau no. batch…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={cn(inputBase, 'pl-9 w-80')}
-          />
+      <div className={cn('rounded-xl p-4 mb-5 shadow-sm flex flex-col md:flex-row gap-3 items-start md:items-center justify-between', card)}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Cari kode, nama, atau no. batch…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className={cn(inputBase, 'pl-9 w-full')}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter size={15} className="text-gray-400 flex-shrink-0" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className={cn(inputBase, 'text-xs py-2')}
+            >
+              <option value="all">Semua Status</option>
+              <option value="waiting_spv">Menunggu SPV</option>
+              <option value="waiting_mgr">Menunggu Manager</option>
+              <option value="approved">Disetujui (Approved)</option>
+              <option value="rejected">Ditolak (Rejected)</option>
+              <option value="draft">Draft</option>
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end md:self-auto">
           <button
             onClick={handleExportXLSX}
             disabled={reports.length === 0}
@@ -229,7 +290,7 @@ export default function ReportBatchKhususPage() {
           <div className="flex flex-col items-center justify-center py-16">
             <FileBarChart size={36} className={isDark ? 'text-gray-600 mb-3' : 'text-gray-300 mb-3'} />
             <p className={cn('text-sm font-medium', isDark ? 'text-gray-400' : 'text-gray-500')}>
-              {search ? 'Tidak ada data yang sesuai pencarian.' : 'Belum ada laporan yang tersimpan.'}
+              {search || filterStatus !== 'all' ? 'Tidak ada data yang sesuai filter.' : 'Belum ada laporan yang tersimpan.'}
             </p>
           </div>
         ) : (
@@ -241,8 +302,10 @@ export default function ReportBatchKhususPage() {
                   <th className={th}>Kode Produk</th>
                   <th className={th}>Nama Produk</th>
                   <th className={th}>No. Batch</th>
+                  <th className={th}>Status</th>
+                  <th className={th}>Verifikasi</th>
                   <th className={th}>Tanggal Pembuatan</th>
-                  <th className={cn(th, 'text-right')}>Bobot Total (F5)</th>
+                  <th className={cn(th, 'text-right')}>Bobot Total</th>
                   <th className={th}>Dibuat Oleh</th>
                   {canDelete && <th className={cn(th, 'text-center')}>Aksi</th>}
                 </tr>
@@ -267,6 +330,38 @@ export default function ReportBatchKhususPage() {
                     </td>
                     <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>
                       {r.no_batch || '—'}
+                    </td>
+                    <td className={cn(td, 'whitespace-nowrap')}>
+                      <div className="flex items-center gap-1.5">
+                        {renderStatusBadge(r.status)}
+                        {r.status === 'rejected' && r.reject_note && (
+                          <button
+                            onClick={() => setActiveNote({ batch: r.no_batch, note: r.reject_note || '' })}
+                            className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                            title="Lihat alasan penolakan"
+                          >
+                            <AlertCircle size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className={cn(td, 'text-xs')}>
+                      <div className="flex flex-col gap-0.5 text-[11px]">
+                        {r.spv_name ? (
+                          <span className="text-green-600 dark:text-green-400">
+                            ✓ SPV: {r.spv_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">— SPV: Belum</span>
+                        )}
+                        {r.mgr_name ? (
+                          <span className="text-green-600 dark:text-green-400">
+                            ✓ MGR: {r.mgr_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">— MGR: Belum</span>
+                        )}
+                      </div>
                     </td>
                     <td className={cn(td, 'whitespace-nowrap')}>{fmtDateTime(r.created_at)}</td>
                     <td className={cn(td, 'text-right font-semibold tabular-nums')}>
@@ -329,6 +424,30 @@ export default function ReportBatchKhususPage() {
           </div>
         )}
       </div>
+
+      {/* Reject Note Modal */}
+      {activeNote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className={cn('w-full max-w-md rounded-2xl p-6 shadow-2xl border', card)}>
+            <div className="flex items-center gap-2 mb-3 text-red-500">
+              <XCircle size={20} />
+              <h3 className="font-bold text-base">Alasan Penolakan</h3>
+            </div>
+            <p className={cn('text-xs mb-2', isDark ? 'text-gray-400' : 'text-gray-500')}>
+              No. Batch: <span className="font-mono font-semibold">{activeNote.batch}</span>
+            </p>
+            <div className={cn('p-3 rounded-lg text-sm mb-4', isDark ? 'bg-red-950/40 border border-red-800 text-red-200' : 'bg-red-50 border border-red-200 text-red-800')}>
+              {activeNote.note}
+            </div>
+            <button
+              onClick={() => setActiveNote(null)}
+              className="w-full py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

@@ -29,6 +29,7 @@ type User struct {
 	FullName  string    `json:"full_name"`
 	Password  string    `json:"-"` 
 	Role      Role      `json:"role"`
+	Jabatan   string    `json:"jabatan"`
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -95,17 +96,29 @@ type BKProduct struct {
 }
 
 type BKReport struct {
-	ID             int       `json:"id"`
-	KodeProduk     string    `json:"kode_produk"`
-	NamaProduk     string    `json:"nama_produk,omitempty"`
-	NoBatch        string    `json:"no_batch"`
-	TglPembuatan   time.Time `json:"tgl_pembuatan"`
-	BobotTotal     float64   `json:"bobot_total"`
-	InputSisaMinor float64   `json:"input_sisa_minor"`
-	DetailJSON     string    `json:"detail_json,omitempty"` 
-	CreatedBy      int       `json:"created_by"`
-	CreatedByName  string    `json:"created_by_name,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             int        `json:"id"`
+	KodeProduk     string     `json:"kode_produk"`
+	NamaProduk     string     `json:"nama_produk,omitempty"`
+	NoBatch        string     `json:"no_batch"`
+	TglPembuatan   time.Time  `json:"tgl_pembuatan"`
+	BobotTotal     float64    `json:"bobot_total"`
+	InputSisaMinor float64    `json:"input_sisa_minor"`
+	DetailJSON     string     `json:"detail_json,omitempty"` 
+	CreatedBy      int        `json:"created_by"`
+	CreatedByName  string     `json:"created_by_name,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	Status         string     `json:"status"` // 'draft', 'waiting_spv', 'waiting_mgr', 'approved', 'rejected'
+	SPVID          *int       `json:"spv_id,omitempty"`
+	SPVName        string     `json:"spv_name,omitempty"`
+	SPVApprovedAt  *time.Time `json:"spv_approved_at,omitempty"`
+	MGRID          *int       `json:"mgr_id,omitempty"`
+	MGRName        string     `json:"mgr_name,omitempty"`
+	MGRApprovedAt  *time.Time `json:"mgr_approved_at,omitempty"`
+	RejectedBy     *int       `json:"rejected_by,omitempty"`
+	RejectedByName string     `json:"rejected_by_name,omitempty"`
+	RejectedAt     *time.Time `json:"rejected_at,omitempty"`
+	RejectNote     string     `json:"reject_note,omitempty"`
+	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
 }
 
 type BKReportListResponse struct {
@@ -121,6 +134,33 @@ type CreateBKReportRequest struct {
 	TglPembuatan   string  `json:"tgl_pembuatan" binding:"required"`
 	BobotTotal     float64 `json:"bobot_total" binding:"required"`
 	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
+	Status         string  `json:"status"` // 'draft' or 'waiting_spv'
+}
+
+type UpdateBKReportRequest struct {
+	BobotTotal     float64 `json:"bobot_total" binding:"required"`
+	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
+}
+
+type RejectBKReportRequest struct {
+	RejectNote string `json:"reject_note" binding:"required"`
+}
+
+type ApprovalNotificationItem struct {
+	ID            int        `json:"id"`
+	KodeProduk    string     `json:"kode_produk"`
+	NamaProduk    string     `json:"nama_produk"`
+	NoBatch       string     `json:"no_batch"`
+	CreatedByName string     `json:"created_by_name"`
+	CreatedAt     time.Time  `json:"created_at"`
+	Status        string     `json:"status"`
+	UpdatedAt     *time.Time `json:"updated_at,omitempty"`
+	RejectNote    string     `json:"reject_note,omitempty"`
+}
+
+type NotificationResponse struct {
+	PendingCount int                        `json:"pending_count"`
+	Items        []ApprovalNotificationItem `json:"items"`
 }
 
 type BOMaterial struct {

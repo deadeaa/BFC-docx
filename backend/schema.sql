@@ -248,7 +248,20 @@ CREATE TABLE public.bk_reports (
     bobot_total numeric(14,4) NOT NULL,
     input_sisa_minor numeric(12,4) NOT NULL,
     created_by integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    detail_json text,
+    status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
+    spv_id integer,
+    spv_name character varying(200),
+    spv_approved_at timestamp with time zone,
+    mgr_id integer,
+    mgr_name character varying(200),
+    mgr_approved_at timestamp with time zone,
+    rejected_by integer,
+    rejected_by_name character varying(200),
+    rejected_at timestamp with time zone,
+    reject_note text,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -477,10 +490,11 @@ CREATE TABLE public.users (
     full_name character varying(200) NOT NULL,
     password character varying(255) NOT NULL,
     role character varying(50) NOT NULL,
+    jabatan character varying(20) DEFAULT NULL,
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT users_role_check CHECK (((role)::text = ANY ((ARRAY['admin'::character varying, 'produksi'::character varying, 'qa'::character varying])::text[])))
+    CONSTRAINT users_role_check CHECK (((role)::text = ANY ((ARRAY['admin'::character varying, 'ts'::character varying, 'ppic'::character varying, 'produksi'::character varying, 'qa'::character varying])::text[])))
 );
 
 

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"bfc-backend/audit"
+	"bfc-backend/middleware"
 	"bfc-backend/models"
 	"bfc-backend/repository"
 
@@ -158,6 +160,11 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 
 	userID, _ := c.Get("user_id")
 
+	status := "draft"
+	if req.Status == "waiting_spv" {
+		status = "waiting_spv"
+	}
+
 	report := &models.BKReport{
 		KodeProduk:     req.KodeProduk,
 		NoBatch:        req.NoBatch,
@@ -166,6 +173,7 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 		InputSisaMinor: req.InputSisaMinor,
 		DetailJSON:     string(detailJSON),
 		CreatedBy:      userID.(int),
+		Status:         status,
 	}
 
 	created, err := h.db.CreateBKReport(c, report)
@@ -174,13 +182,266 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 		return
 	}
 
+	act := "Menyimpan Draft Perhitungan Batch Khusus"
+	if status == "waiting_spv" {
+		act = "Mengajukan Approval Batch Khusus"
+	}
 	audit.Log(c, h.db, audit.Entry{
 		Menu:        "Batch Khusus",
-		Activity:    "Membuat Perhitungan Batch Khusus",
-		Description: "Membuat perhitungan Batch Khusus untuk produk " + req.KodeProduk + ", No. Batch " + req.NoBatch,
+		Activity:    act,
+		Description: act + " untuk produk " + req.KodeProduk + ", No. Batch " + req.NoBatch,
 	})
 
 	c.JSON(http.StatusCreated, created)
+}
+
+func (h *BatchKhususHandler) GetReport(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	rep, err := h.db.GetBKReportByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, rep)
+}
+
+func (h *BatchKhususHandler) UpdateReport(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	role, _ := c.Get(middleware.CtxRole)
+	roleStr, _ := role.(string)
+	jabatan, _ := c.Get(middleware.CtxJabatan)
+	jabatanStr, _ := jabatan.(string)
+
+	if roleStr != "admin" && jabatanStr == "mgr" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Manager tidak diizinkan mengubah isi perhitungan"})
+		return
+	}
+
+	existing, err := h.db.GetBKReportByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	var req models.UpdateBKReportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak lengkap: " + err.Error()})
+		return
+	}
+
+	product, err := h.db.GetBKProductFullByKode(c, existing.KodeProduk)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memuat produk"})
+		return
+	}
+
+	materialValues := computeBKMaterialValues(product, req.InputSisaMinor)
+	var total float64
+	for _, v := range materialValues {
+		total += v
+	}
+
+	detailData := map[string]interface{}{
+		"materials":        product.Materials,
+		"values":           materialValues,
+		"total":            total,
+		"input_sisa_minor": req.InputSisaMinor,
+		"bobot_total":      req.BobotTotal,
+	}
+	detailJSON, _ := json.Marshal(detailData)
+
+	if err := h.db.UpdateBKReportCalculation(c, id, req.BobotTotal, req.InputSisaMinor, string(detailJSON)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memperbarui laporan"})
+		return
+	}
+
+	updated, _ := h.db.GetBKReportByID(c, id)
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "Batch Khusus",
+		Activity:    "Mengubah Perhitungan Batch Khusus",
+		Description: "Mengubah perhitungan Batch Khusus untuk produk " + existing.KodeProduk + ", No. Batch " + existing.NoBatch,
+	})
+
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *BatchKhususHandler) SubmitReport(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	existing, err := h.db.GetBKReportByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	if existing.Status != "draft" && existing.Status != "rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Hanya laporan berstatus draft atau ditolak yang dapat diajukan"})
+		return
+	}
+
+	if err := h.db.SubmitBKReportForApproval(c, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengajukan approval"})
+		return
+	}
+
+	updated, _ := h.db.GetBKReportByID(c, id)
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "Batch Khusus",
+		Activity:    "Mengajukan Approval Batch Khusus",
+		Description: "Mengajukan approval Batch Khusus untuk produk " + existing.KodeProduk + ", No. Batch " + existing.NoBatch,
+	})
+
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	role, _ := c.Get(middleware.CtxRole)
+	roleStr, _ := role.(string)
+	jabatan, _ := c.Get(middleware.CtxJabatan)
+	jabatanStr, _ := jabatan.(string)
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
+
+	user, err := h.db.GetUserByID(c, uid)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User tidak valid"})
+		return
+	}
+
+	existing, err := h.db.GetBKReportByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	if existing.Status == "waiting_spv" || (roleStr == "admin" && existing.Status == "draft") {
+		// SPV approval step
+		if roleStr != "admin" && jabatanStr != "spv" {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor (SPV) atau Administrator yang dapat menyetujui tahap ini"})
+			return
+		}
+		if err := h.db.ApproveBKReportBySPV(c, id, user.ID, user.FullName); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyetujui laporan: " + err.Error()})
+			return
+		}
+	} else if existing.Status == "waiting_mgr" {
+		// MGR approval step
+		if roleStr != "admin" && jabatanStr != "mgr" {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Manager (MGR) atau Administrator yang dapat menyetujui tahap akhir ini"})
+			return
+		}
+		if err := h.db.ApproveBKReportByMGR(c, id, user.ID, user.FullName); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyetujui laporan: " + err.Error()})
+			return
+		}
+	} else if existing.Status == "approved" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Laporan sudah disetujui (Approved)"})
+		return
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Status laporan belum dalam antrean approval SPV/MGR"})
+		return
+	}
+
+	updated, _ := h.db.GetBKReportByID(c, id)
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "Batch Khusus",
+		Activity:    "Approve Perhitungan Batch Khusus",
+		Description: "Approve Batch Khusus untuk produk " + existing.KodeProduk + ", No. Batch " + existing.NoBatch + " oleh " + user.FullName,
+	})
+
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	role, _ := c.Get(middleware.CtxRole)
+	roleStr, _ := role.(string)
+	jabatan, _ := c.Get(middleware.CtxJabatan)
+	jabatanStr, _ := jabatan.(string)
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
+
+	if roleStr != "admin" && jabatanStr != "spv" && jabatanStr != "mgr" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor atau Manager yang dapat menolak perhitungan"})
+		return
+	}
+
+	var req models.RejectBKReportRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RejectNote) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Catatan / alasan penolakan wajib diisi"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(c, uid)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User tidak valid"})
+		return
+	}
+
+	existing, err := h.db.GetBKReportByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	if err := h.db.RejectBKReport(c, id, user.ID, user.FullName, strings.TrimSpace(req.RejectNote)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menolak laporan"})
+		return
+	}
+
+	updated, _ := h.db.GetBKReportByID(c, id)
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "Batch Khusus",
+		Activity:    "Reject Perhitungan Batch Khusus",
+		Description: "Reject Batch Khusus untuk produk " + existing.KodeProduk + ", No. Batch " + existing.NoBatch + " oleh " + user.FullName + ", alasan: " + req.RejectNote,
+	})
+
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *BatchKhususHandler) GetNotifications(c *gin.Context) {
+	role, _ := c.Get(middleware.CtxRole)
+	roleStr, _ := role.(string)
+	jabatan, _ := c.Get(middleware.CtxJabatan)
+	jabatanStr, _ := jabatan.(string)
+
+	resp, err := h.db.GetPendingApprovalNotifications(c, roleStr, jabatanStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memuat notifikasi"})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *BatchKhususHandler) ListReports(c *gin.Context) {
@@ -193,8 +454,9 @@ func (h *BatchKhususHandler) ListReports(c *gin.Context) {
 		pageSize = 50
 	}
 	search := c.Query("search")
+	status := c.Query("status")
 
-	reports, total, err := h.db.ListBKReports(c, search, page, pageSize)
+	reports, total, err := h.db.ListBKReports(c, search, status, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengambil laporan"})
 		return

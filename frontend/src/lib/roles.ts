@@ -1,4 +1,4 @@
-import type { Role } from '../types'
+import type { Role, Jabatan, BKReportStatus } from '../types'
 
 // Satu-satunya sumber label tampilan Role di seluruh aplikasi.
 export const ROLE_LABELS: Record<Role, string> = {
@@ -9,9 +9,42 @@ export const ROLE_LABELS: Record<Role, string> = {
   ts: 'Technical Services',
 }
 
+export const JABATAN_LABELS: Record<Jabatan, string> = {
+  staff: 'Staff',
+  spv: 'Supervisor (SPV)',
+  mgr: 'Manager (MGR)',
+}
+
 export function roleLabel(role: Role | string | undefined | null): string {
   if (!role) return ''
   return ROLE_LABELS[role as Role] ?? role
+}
+
+export function jabatanLabel(jabatan?: Jabatan | string | null): string {
+  if (!jabatan) return ''
+  return JABATAN_LABELS[jabatan as Jabatan] ?? jabatan
+}
+
+export function fullRoleLabel(role?: Role | string | null, jabatan?: Jabatan | string | null): string {
+  if (!role) return ''
+  const rLabel = roleLabel(role)
+  if (role === 'ts' && jabatan) {
+    return `${rLabel} · ${jabatanLabel(jabatan)}`
+  }
+  return rLabel
+}
+
+export const STATUS_LABELS: Record<BKReportStatus, string> = {
+  draft: 'Draft',
+  waiting_spv: 'Menunggu SPV',
+  waiting_mgr: 'Menunggu Manager',
+  approved: 'Disetujui',
+  rejected: 'Ditolak',
+}
+
+export function statusLabel(status?: BKReportStatus | string | null): string {
+  if (!status) return 'Draft'
+  return STATUS_LABELS[status as BKReportStatus] ?? status
 }
 
 export const SIGNUP_ROLES: Role[] = ['produksi', 'qa', 'ppic']

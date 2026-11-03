@@ -44,7 +44,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := h.jwtSvc.GenerateAccessToken(user.ID, user.Username, string(user.Role))
+	accessToken, err := h.jwtSvc.GenerateAccessToken(user.ID, user.Username, string(user.Role), user.Jabatan)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal membuat token"})
 		return
@@ -71,6 +71,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"username":   user.Username,
 			"full_name":  user.FullName,
 			"role":       user.Role,
+			"jabatan":    user.Jabatan,
 			"is_active":  user.IsActive,
 			"created_at": user.CreatedAt,
 			"updated_at": user.UpdatedAt,
@@ -111,7 +112,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := h.jwtSvc.GenerateAccessToken(user.ID, user.Username, string(user.Role))
+	accessToken, err := h.jwtSvc.GenerateAccessToken(user.ID, user.Username, string(user.Role), user.Jabatan)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal membuat token"})
 		return
@@ -206,6 +207,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		"username":   user.Username,
 		"full_name":  user.FullName,
 		"role":       user.Role,
+		"jabatan":    user.Jabatan,
 		"is_active":  user.IsActive,
 		"created_at": user.CreatedAt,
 		"updated_at": user.UpdatedAt,

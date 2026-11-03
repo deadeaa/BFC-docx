@@ -1,10 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { Plus, Pencil, Trash2, X, Check, Search, UserCircle2 } from 'lucide-react'
 import api from '../../lib/api'
-import type { User, Role } from '../../types'
+import type { User, Role, Jabatan } from '../../types'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
-import { roleLabel } from '../../lib/roles'
+import { roleLabel, jabatanLabel } from '../../lib/roles'
 
 const ROLES: Role[] = ['admin', 'ts', 'ppic', 'produksi', 'qa']
 
@@ -13,6 +13,7 @@ interface UserForm {
   full_name: string
   password: string
   role: Role
+  jabatan: Jabatan | ''
   is_active: boolean
 }
 
@@ -21,6 +22,7 @@ const emptyForm = (): UserForm => ({
   full_name: '',
   password: '',
   role: 'produksi',
+  jabatan: '',
   is_active: true,
 })
 
@@ -67,6 +69,7 @@ export default function UsersPage() {
       full_name: u.full_name,
       password: '',
       role: u.role,
+      jabatan: (u.jabatan as Jabatan) || (u.role === 'ts' ? 'staff' : ''),
       is_active: u.is_active,
     })
     setError('')
@@ -222,11 +225,24 @@ export default function UsersPage() {
                       {u.username}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${roleBadge(u.role)}`}
-                      >
-                        {roleLabel(u.role)}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${roleBadge(u.role)}`}
+                        >
+                          {roleLabel(u.role)}
+                        </span>
+                        {u.role === 'ts' && u.jabatan && (
+                          <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-medium ${
+                            u.jabatan === 'mgr' 
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' 
+                              : u.jabatan === 'spv'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {jabatanLabel(u.jabatan)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -329,7 +345,14 @@ export default function UsersPage() {
                 </label>
                 <select
                   value={form.role}
-                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
+                  onChange={(e) => {
+                    const nextRole = e.target.value as Role
+                    setForm((f) => ({
+                      ...f,
+                      role: nextRole,
+                      jabatan: nextRole === 'ts' ? (f.jabatan || 'staff') : '',
+                    }))
+                  }}
                   className={inputCls}
                 >
                   {ROLES.map((r) => (
@@ -339,6 +362,30 @@ export default function UsersPage() {
                   ))}
                 </select>
               </div>
+
+              {form.role === 'ts' && (
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Jabatan Technical Services
+                  </label>
+                  <select
+                    value={form.jabatan || 'staff'}
+                    onChange={(e) => setForm((f) => ({ ...f, jabatan: e.target.value as Jabatan }))}
+                    className={inputCls}
+                  >
+                    <option value="staff">Staff (TS)</option>
+                    <option value="spv">Supervisor (SPV)</option>
+                    <option value="mgr">Manager (MGR)</option>
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {form.jabatan === 'mgr' 
+                      ? 'Manager: approval tahap akhir, tidak dapat mengubah perhitungan'
+                      : form.jabatan === 'spv'
+                      ? 'Supervisor: approval tahap 1 & dapat mengedit perhitungan'
+                      : 'Staff: membuat & mengirim perhitungan untuk approval'}
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <input

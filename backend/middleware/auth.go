@@ -13,6 +13,7 @@ import (
 const CtxUserID = "user_id"
 const CtxUsername = "username"
 const CtxRole = "role"
+const CtxJabatan = "jabatan"
 
 func Auth(jwtSvc *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -30,6 +31,7 @@ func Auth(jwtSvc *auth.Service) gin.HandlerFunc {
 		c.Set(CtxUserID, claims.UserID)
 		c.Set(CtxUsername, claims.Username)
 		c.Set(CtxRole, claims.Role)
+		c.Set(CtxJabatan, claims.Jabatan)
 		c.Next()
 	}
 }
