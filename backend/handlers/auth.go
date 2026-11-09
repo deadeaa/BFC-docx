@@ -137,7 +137,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 }
 
 // Endpoint publik (tidak memerlukan JWT) untuk Sign Up mandiri. Role yang
-// boleh dipilih HANYA "produksi", "qa", atau "ppic" — role "admin" dan "ts" 
+// boleh dipilih HANYA "produksi", "qa", atau "ppic" — role "admin" dan "ts"
 // tidak boleh dibuat melalui endpoint ini.
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req struct {

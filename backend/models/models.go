@@ -12,7 +12,7 @@ const (
 	RolePPIC     Role = "ppic"
 	RoleProduksi Role = "produksi"
 	RoleQA       Role = "qa"
-	RoleTS       Role = "ts" 
+	RoleTS       Role = "ts"
 )
 
 func (r Role) IsAdminOrTS() bool {
@@ -27,7 +27,7 @@ type User struct {
 	ID        int       `json:"id"`
 	Username  string    `json:"username"`
 	FullName  string    `json:"full_name"`
-	Password  string    `json:"-"` 
+	Password  string    `json:"-"`
 	Role      Role      `json:"role"`
 	Jabatan   string    `json:"jabatan"`
 	IsActive  bool      `json:"is_active"`
@@ -103,7 +103,7 @@ type BKReport struct {
 	TglPembuatan   time.Time  `json:"tgl_pembuatan"`
 	BobotTotal     float64    `json:"bobot_total"`
 	InputSisaMinor float64    `json:"input_sisa_minor"`
-	DetailJSON     string     `json:"detail_json,omitempty"` 
+	DetailJSON     string     `json:"detail_json,omitempty"`
 	CreatedBy      int        `json:"created_by"`
 	CreatedByName  string     `json:"created_by_name,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
@@ -132,13 +132,13 @@ type CreateBKReportRequest struct {
 	KodeProduk     string  `json:"kode_produk" binding:"required"`
 	NoBatch        string  `json:"no_batch" binding:"required"`
 	TglPembuatan   string  `json:"tgl_pembuatan" binding:"required"`
-	BobotTotal     float64 `json:"bobot_total" binding:"required"`
+	BobotTotal     float64 `json:"bobot_total" `
 	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
 	Status         string  `json:"status"` // 'draft' or 'waiting_spv'
 }
 
 type UpdateBKReportRequest struct {
-	BobotTotal     float64 `json:"bobot_total" binding:"required"`
+	BobotTotal     float64 `json:"bobot_total" `
 	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
 }
 
@@ -147,15 +147,16 @@ type RejectBKReportRequest struct {
 }
 
 type ApprovalNotificationItem struct {
-	ID            int        `json:"id"`
-	KodeProduk    string     `json:"kode_produk"`
-	NamaProduk    string     `json:"nama_produk"`
-	NoBatch       string     `json:"no_batch"`
-	CreatedByName string     `json:"created_by_name"`
-	CreatedAt     time.Time  `json:"created_at"`
-	Status        string     `json:"status"`
-	UpdatedAt     *time.Time `json:"updated_at,omitempty"`
-	RejectNote    string     `json:"reject_note,omitempty"`
+	ID              int        `json:"id"`
+	KodeProduk      string     `json:"kode_produk"`
+	NamaProduk      string     `json:"nama_produk"`
+	NoBatch         string     `json:"no_batch"`
+	CreatedByName   string     `json:"created_by_name"`
+	CreatedAt       time.Time  `json:"created_at"`
+	Status          string     `json:"status"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	RejectNote      string     `json:"reject_note,omitempty"`
+	RejectedByName  string     `json:"rejected_by_name,omitempty"`
 }
 
 type NotificationResponse struct {
@@ -258,49 +259,49 @@ type AdminBOThresholdConfig struct {
 }
 
 type AdminBKProductRequest struct {
-	KodeProduk string                    `json:"kode_produk" binding:"required"`
-	NamaProduk string                    `json:"nama_produk" binding:"required"`
-	Materials  []AdminBKProductConfig    `json:"materials"`
-	Rendemen   []AdminBKRendemenConfig   `json:"rendemen"`
+	KodeProduk string                  `json:"kode_produk" binding:"required"`
+	NamaProduk string                  `json:"nama_produk" binding:"required"`
+	Materials  []AdminBKProductConfig  `json:"materials"`
+	Rendemen   []AdminBKRendemenConfig `json:"rendemen"`
 }
 
 type AdminBOProductRequest struct {
-	KodeProduk string                     `json:"kode_produk" binding:"required"`
-	NamaProduk string                     `json:"nama_produk" binding:"required"`
-	Materials  []AdminBOProductConfig     `json:"materials"`
-	Thresholds []AdminBOThresholdConfig   `json:"thresholds"`
+	KodeProduk string                   `json:"kode_produk" binding:"required"`
+	NamaProduk string                   `json:"nama_produk" binding:"required"`
+	Materials  []AdminBOProductConfig   `json:"materials"`
+	Thresholds []AdminBOThresholdConfig `json:"thresholds"`
 }
 
 type AdminBKProductResponse struct {
-	ID         int                    `json:"id"`
-	KodeProduk string                 `json:"kode_produk"`
-	NamaProduk string                 `json:"nama_produk"`
-	Materials  []AdminBKProductConfig `json:"materials"`
-	Rendemen   []AdminBKRendemenConfig `json:"rendemen"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-}
-
-type AdminBOProductResponse struct {
 	ID         int                     `json:"id"`
 	KodeProduk string                  `json:"kode_produk"`
 	NamaProduk string                  `json:"nama_produk"`
-	Materials  []AdminBOProductConfig  `json:"materials"`
-	Thresholds []AdminBOThresholdConfig `json:"thresholds"`
+	Materials  []AdminBKProductConfig  `json:"materials"`
+	Rendemen   []AdminBKRendemenConfig `json:"rendemen"`
 	CreatedAt  time.Time               `json:"created_at"`
 	UpdatedAt  time.Time               `json:"updated_at"`
 }
 
+type AdminBOProductResponse struct {
+	ID         int                      `json:"id"`
+	KodeProduk string                   `json:"kode_produk"`
+	NamaProduk string                   `json:"nama_produk"`
+	Materials  []AdminBOProductConfig   `json:"materials"`
+	Thresholds []AdminBOThresholdConfig `json:"thresholds"`
+	CreatedAt  time.Time                `json:"created_at"`
+	UpdatedAt  time.Time                `json:"updated_at"`
+}
+
 type BOProductRequest struct {
-	KodeProduk string          `json:"kode_produk" binding:"required"`
-	NamaProduk string          `json:"nama_produk" binding:"required"`
-	Materials  []BOMaterial    `json:"materials"`
-	Thresholds []BOThreshold   `json:"thresholds"`
+	KodeProduk string        `json:"kode_produk" binding:"required"`
+	NamaProduk string        `json:"nama_produk" binding:"required"`
+	Materials  []BOMaterial  `json:"materials"`
+	Thresholds []BOThreshold `json:"thresholds"`
 }
 
 type BKProductRequest struct {
-	KodeProduk string        `json:"kode_produk" binding:"required"`
-	NamaProduk string        `json:"nama_produk" binding:"required"`
-	Materials  []BKMaterial  `json:"materials"`
-	Rendemen   []BKRendemen  `json:"rendemen"`
+	KodeProduk string       `json:"kode_produk" binding:"required"`
+	NamaProduk string       `json:"nama_produk" binding:"required"`
+	Materials  []BKMaterial `json:"materials"`
+	Rendemen   []BKRendemen `json:"rendemen"`
 }

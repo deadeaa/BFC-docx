@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"context"
 	"bfc-backend/models"
+	"context"
 )
 
 func (db *DB) SaveReportTemplate(ctx context.Context, template *models.ReportTemplate) error {
@@ -10,7 +10,7 @@ func (db *DB) SaveReportTemplate(ctx context.Context, template *models.ReportTem
 		INSERT INTO report_templates (kode_produk, nama_file, file_path, created_by)
 		VALUES ($1, $2, $3, $4)
 	`
-	_, err := db.pool.Exec(ctx, query, 
+	_, err := db.pool.Exec(ctx, query,
 		template.KodeProduk, template.NamaFile, template.FilePath, template.CreatedBy)
 	return err
 }
@@ -59,7 +59,7 @@ func (db *DB) ListReportTemplates(ctx context.Context) ([]models.ReportTemplate,
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var templates []models.ReportTemplate
 	for rows.Next() {
 		var t models.ReportTemplate

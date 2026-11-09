@@ -44,13 +44,13 @@ func (h *BatchOverfilledHandler) GetProduct(c *gin.Context) {
 
 func (h *BatchOverfilledHandler) GetLatestReport(c *gin.Context) {
 	kode := c.Param("kode")
-	
+
 	report, err := h.db.GetLatestBOReportByProduct(c, kode)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Belum ada laporan untuk produk ini"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, report)
 }
 
@@ -58,12 +58,12 @@ func (h *BatchOverfilledHandler) GetProductReports(c *gin.Context) {
 	kode := c.Param("kode")
 	noBatch := c.Query("no_batch")
 	limit := c.DefaultQuery("limit", "50")
-	
+
 	limitInt := 50
 	if l, err := strconv.Atoi(limit); err == nil && l > 0 {
 		limitInt = l
 	}
-	
+
 	reports, err := h.db.ListBOReportsByProduct(c, kode, noBatch, limitInt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengambil riwayat"})

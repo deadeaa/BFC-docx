@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FileBarChart, Search, RefreshCw, FileDown, Trash2, ChevronLeft, ChevronRight, CheckCircle2, Clock, CheckCheck, XCircle, Filter, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { FileBarChart, Search, RefreshCw, FileDown, Trash2, ChevronLeft, ChevronRight, CheckCircle2, Filter, AlertCircle, XCircle, Clock } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import api from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -34,11 +35,52 @@ function todayFilename(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, '/')
 }
 
+
+// ─── Stempel DENGAN kotak (icon + nama + tanggal) ──────────────────────────
+function StampApprove({ name, date }: { name: string; date?: string | null }) {
+  return (
+    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border-2 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 text-green-700 dark:text-green-300 text-[11px] font-semibold">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+      <span className="leading-tight">
+        {name}
+        {date && (
+          <span className="block text-[9px] font-normal opacity-80">
+            {new Date(date).toLocaleDateString('id-ID')}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+function StampReject({ name, date }: { name: string; date?: string | null }) {
+  return (
+    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border-2 border-red-500 bg-red-50 dark:bg-red-900/20 dark:border-red-600 text-red-700 dark:text-red-300 text-[11px] font-semibold">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+      <span className="leading-tight">
+        {name}
+        {date && (
+          <span className="block text-[9px] font-normal opacity-80">
+            {new Date(date).toLocaleDateString('id-ID')}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
 export default function ReportBatchKhususPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const { hasRole } = useAuth()
-  const canDelete = hasRole('admin', 'ts')
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  // Hapus: HANYA admin murni
+  const canDelete = user?.role === 'admin'
 
   const [reports, setReports] = useState<BKReport[]>([])
   const [total, setTotal] = useState(0)
@@ -50,7 +92,7 @@ export default function ReportBatchKhususPage() {
   const [deleteTarget, setDeleteTarget] = useState<BKReport | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState('')
-  const [activeNote, setActiveNote] = useState<{ batch: string; note: string } | null>(null)
+  const [activeNote, setActiveNote] = useState<{ batch: string; note: string; by: string } | null>(null)
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -90,6 +132,15 @@ export default function ReportBatchKhususPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  // Klik baris → navigate ke halaman perhitungan, auto-load report
+  function openReport(r: BKReport) {
+    const params = new URLSearchParams()
+    params.set('kode', r.kode_produk)
+    params.set('report', String(r.id))
+    if (r.no_batch) params.set('no_batch', r.no_batch)
+    navigate(`/perhitungan/batch-khusus?${params.toString()}`)
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
@@ -113,33 +164,25 @@ export default function ReportBatchKhususPage() {
     const filename = `Report_Batch_Khusus_${todayFilename()}.xlsx`
 
     const data = reports.map((r, i) => ({
-      'No':             (page - 1) * PAGE_SIZE + i + 1,
-      'Kode Produk':    r.kode_produk,
-      'Nama Produk':    r.nama_produk ?? '',
-      'No. Batch':      r.no_batch ?? '',
-      'Status':         statusLabel(r.status),
-      'Tgl Pembuatan':  fmtDateTime(r.created_at),
-      'Bobot Total':    r.bobot_total,
-      'Dibuat Oleh':    r.created_by_name ?? '',
-      'SPV (Pemeriksa)': r.spv_name ?? '',
+      'No':               (page - 1) * PAGE_SIZE + i + 1,
+      'Kode Produk':      r.kode_produk,
+      'Nama Produk':      r.nama_produk ?? '',
+      'No. Batch':        r.no_batch ?? '',
+      'Status':           statusLabel(r.status),
+      'Tgl Pembuatan':    fmtDateTime(r.created_at),
+      'Input Sisa Minor': r.input_sisa_minor,
+      'Dibuat Oleh':      r.created_by_name ?? '',
+      'SPV (Pemeriksa)':  r.spv_name ?? '',
       'MGR (Penyetujui)': r.mgr_name ?? '',
-      'Catatan Tolak':  r.reject_note ?? '',
+      'Ditolak Oleh':     r.rejected_by_name ?? '',
+      'Catatan Tolak':    r.reject_note ?? '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(data)
-
     ws['!cols'] = [
-      { wch: 5 },   // No
-      { wch: 14 },  // Kode Produk
-      { wch: 32 },  // Nama Produk
-      { wch: 18 },  // No. Batch
-      { wch: 18 },  // Status
-      { wch: 20 },  // Tgl Pembuatan
-      { wch: 14 },  // Bobot Total
-      { wch: 20 },  // Dibuat Oleh
-      { wch: 20 },  // SPV
-      { wch: 20 },  // MGR
-      { wch: 30 },  // Catatan Tolak
+      { wch: 5 }, { wch: 14 }, { wch: 32 }, { wch: 18 }, { wch: 18 },
+      { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+      { wch: 20 }, { wch: 30 },
     ]
 
     const wb = XLSX.utils.book_new()
@@ -152,29 +195,25 @@ export default function ReportBatchKhususPage() {
       case 'approved':
         return (
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">
-            <CheckCheck size={12} />
-            Disetujui
+            <CheckCircle2 size={12} /> Disetujui
           </span>
         )
       case 'waiting_mgr':
         return (
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-semibold">
-            <Clock size={12} />
-            Menunggu Manager
+            <Clock size={12} /> Menunggu Manager
           </span>
         )
       case 'waiting_spv':
         return (
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-semibold">
-            <Clock size={12} />
-            Menunggu SPV
+            <Clock size={12} /> Menunggu SPV
           </span>
         )
       case 'rejected':
         return (
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold">
-            <XCircle size={12} />
-            Ditolak
+            <XCircle size={12} /> Ditolak
           </span>
         )
       default:
@@ -185,6 +224,68 @@ export default function ReportBatchKhususPage() {
         )
     }
   }
+
+   function renderVerification(r: BKReport) {
+    const items: React.ReactNode[] = []
+
+    // SPV
+    if (r.spv_name) {
+      items.push(
+        <StampApprove key="spv" name={`SPV: ${r.spv_name}`} date={r.spv_approved_at} />
+      )
+    } else if (r.status === 'rejected' && r.rejected_by_name && !r.mgr_name) {
+      // Reject terjadi di tahap SPV (belum ada MGR)
+      items.push(
+        <StampReject key="spv-reject" name={`SPV: ${r.rejected_by_name}`} date={r.rejected_at} />
+      )
+    } else if (r.status === 'waiting_spv') {
+      items.push(
+        <span key="spv-wait" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-amber-400 text-amber-600 dark:text-amber-300 text-[11px] font-medium">
+          <Clock size={11} /> Menunggu SPV
+        </span>
+      )
+    } else {
+      items.push(
+        <span key="spv-none" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-400 text-[11px]">
+          — SPV
+        </span>
+      )
+    }
+
+    // MGR
+    if (r.mgr_name) {
+      items.push(
+        <StampApprove key="mgr" name={`MGR: ${r.mgr_name}`} date={r.mgr_approved_at} />
+      )
+    } else if (r.status === 'rejected' && r.rejected_by_name && r.spv_name) {
+      // Reject terjadi di tahap MGR (SPV sudah approve)
+      items.push(
+        <StampReject key="mgr-reject" name={`MGR: ${r.rejected_by_name}`} date={r.rejected_at} />
+      )
+    } else if (r.status === 'waiting_mgr') {
+      items.push(
+        <span key="mgr-wait" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-purple-400 text-purple-600 dark:text-purple-300 text-[11px] font-medium">
+          <Clock size={11} /> Menunggu MGR
+        </span>
+      )
+    } else if (r.status === 'rejected' && !r.spv_name) {
+      // ditolak di SPV, MGR tidak diproses
+      items.push(
+        <span key="mgr-na" className="inline-flex items-center px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-400 text-[11px]">
+          — MGR
+        </span>
+      )
+    } else {
+      items.push(
+        <span key="mgr-none" className="inline-flex items-center px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-400 text-[11px]">
+          — MGR
+        </span>
+      )
+    }
+
+    return <div className="flex flex-col gap-1">{items}</div>
+  }
+
 
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
@@ -220,7 +321,7 @@ export default function ReportBatchKhususPage() {
           </h1>
         </div>
         <p className={cn('text-sm ml-12', isDark ? 'text-gray-400' : 'text-gray-500')}>
-          Riwayat semua perhitungan batch khusus yang telah disimpan.
+          Klik baris untuk membuka detail perhitungan. Riwayat semua batch khusus yang telah disimpan.
         </p>
       </div>
 
@@ -305,7 +406,7 @@ export default function ReportBatchKhususPage() {
                   <th className={th}>Status</th>
                   <th className={th}>Verifikasi</th>
                   <th className={th}>Tanggal Pembuatan</th>
-                  <th className={cn(th, 'text-right')}>Bobot Total</th>
+                  <th className={cn(th, 'text-right')}>Sisa Minor</th>
                   <th className={th}>Dibuat Oleh</th>
                   {canDelete && <th className={cn(th, 'text-center')}>Aksi</th>}
                 </tr>
@@ -314,7 +415,12 @@ export default function ReportBatchKhususPage() {
                 {reports.map((r, i) => (
                   <tr
                     key={r.id}
-                    className={cn('transition-colors', isDark ? 'hover:bg-gray-700/40' : 'hover:bg-gray-50')}
+                    onClick={() => openReport(r)}
+                    className={cn(
+                      'transition-colors cursor-pointer',
+                      isDark ? 'hover:bg-gray-700/40' : 'hover:bg-gray-50'
+                    )}
+                    title="Klik untuk membuka detail perhitungan"
                   >
                     <td className={cn(td, 'text-gray-400 text-xs w-10')}>{(page - 1) * PAGE_SIZE + i + 1}</td>
                     <td className={td}>
@@ -336,7 +442,14 @@ export default function ReportBatchKhususPage() {
                         {renderStatusBadge(r.status)}
                         {r.status === 'rejected' && r.reject_note && (
                           <button
-                            onClick={() => setActiveNote({ batch: r.no_batch, note: r.reject_note || '' })}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveNote({
+                                batch: r.no_batch,
+                                note: r.reject_note || '',
+                                by: r.rejected_by_name || 'Atasan',
+                              })
+                            }}
                             className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
                             title="Lihat alasan penolakan"
                           >
@@ -345,33 +458,19 @@ export default function ReportBatchKhususPage() {
                         )}
                       </div>
                     </td>
-                    <td className={cn(td, 'text-xs')}>
-                      <div className="flex flex-col gap-0.5 text-[11px]">
-                        {r.spv_name ? (
-                          <span className="text-green-600 dark:text-green-400">
-                            ✓ SPV: {r.spv_name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">— SPV: Belum</span>
-                        )}
-                        {r.mgr_name ? (
-                          <span className="text-green-600 dark:text-green-400">
-                            ✓ MGR: {r.mgr_name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">— MGR: Belum</span>
-                        )}
-                      </div>
-                    </td>
+                    <td className={cn(td, 'min-w-[180px]')}>{renderVerification(r)}</td>
                     <td className={cn(td, 'whitespace-nowrap')}>{fmtDateTime(r.created_at)}</td>
                     <td className={cn(td, 'text-right font-semibold tabular-nums')}>
-                      {fmtNum(r.bobot_total)}
+                      {fmtNum(r.input_sisa_minor)}
                     </td>
                     <td className={cn(td, 'text-xs')}>{r.created_by_name ?? '—'}</td>
                     {canDelete && (
                       <td className={cn(td, 'text-center')}>
                         <button
-                          onClick={() => setDeleteTarget(r)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteTarget(r)
+                          }}
                           className={cn(
                             'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                             isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-600 hover:bg-red-50'
@@ -396,7 +495,7 @@ export default function ReportBatchKhususPage() {
             </span>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={(e) => { e.stopPropagation(); setPage((p) => Math.max(1, p - 1)) }}
                 disabled={page <= 1}
                 className={cn(
                   'flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
@@ -410,7 +509,7 @@ export default function ReportBatchKhususPage() {
                 Halaman {page} / {totalPages}
               </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={(e) => { e.stopPropagation(); setPage((p) => Math.min(totalPages, p + 1)) }}
                 disabled={page >= totalPages}
                 className={cn(
                   'flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
@@ -434,7 +533,8 @@ export default function ReportBatchKhususPage() {
               <h3 className="font-bold text-base">Alasan Penolakan</h3>
             </div>
             <p className={cn('text-xs mb-2', isDark ? 'text-gray-400' : 'text-gray-500')}>
-              No. Batch: <span className="font-mono font-semibold">{activeNote.batch}</span>
+              No. Batch: <span className="font-mono font-semibold">{activeNote.batch}</span> · oleh{' '}
+              <span className="font-semibold">{activeNote.by}</span>
             </p>
             <div className={cn('p-3 rounded-lg text-sm mb-4', isDark ? 'bg-red-950/40 border border-red-800 text-red-200' : 'bg-red-50 border border-red-200 text-red-800')}>
               {activeNote.note}

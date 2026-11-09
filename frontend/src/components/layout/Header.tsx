@@ -33,6 +33,7 @@ export default function Header() {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   // Close dropdown on outside click
@@ -48,7 +49,13 @@ export default function Header() {
 
   function handleSelectNotification(item: ApprovalNotificationItem) {
     setShowDropdown(false)
-    navigate(`/batch-khusus?kode=${encodeURIComponent(item.kode_produk)}&no_batch=${encodeURIComponent(item.no_batch)}&report_id=${item.id}`)
+    // Format query param disamakan dengan BatchKhususPage:
+    // ?kode=...&report=<id>&no_batch=<...>
+    const params = new URLSearchParams()
+    params.set('kode', item.kode_produk)
+    params.set('report', String(item.id))
+    if (item.no_batch) params.set('no_batch', item.no_batch)
+    navigate(`/perhitungan/batch-khusus?${params.toString()}`)
   }
 
   return (
@@ -67,8 +74,7 @@ export default function Header() {
         {/* Dark / Light Toggle */}
         <button
           onClick={toggleTheme}
-          className={`transition-colors p-1.5 rounded-lg
-            ${isDark ? 'text-white/70 hover:text-brand-green-light hover:bg-white/10' : 'text-white/70 hover:text-brand-green-light hover:bg-white/10'}`}
+          className="transition-colors p-1.5 rounded-lg text-white/70 hover:text-brand-green-light hover:bg-white/10"
           title={isDark ? 'Switch to Light' : 'Switch to Dark'}
         >
           {isDark ? <Sun size={18} /> : <Moon size={18} />}
@@ -81,13 +87,12 @@ export default function Header() {
               setShowDropdown(!showDropdown)
               if (!showDropdown) fetchNotifications()
             }}
-            className={`transition-colors p-1.5 rounded-lg relative
-              ${isDark ? 'text-white/70 hover:text-brand-green-light hover:bg-white/10' : 'text-white/70 hover:text-brand-green-light hover:bg-white/10'}`}
+            className="transition-colors p-1.5 rounded-lg relative text-white/70 hover:text-brand-green-light hover:bg-white/10"
             title="Notifikasi Approval"
           >
             <Bell size={18} />
             {pendingCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                 {pendingCount > 99 ? '99+' : pendingCount}
               </span>
             )}
@@ -137,7 +142,7 @@ export default function Header() {
                         <div className="mt-0.5">
                           {isApproved && <CheckCircle2 size={16} className="text-green-500" />}
                           {isRejected && <AlertCircle size={16} className="text-red-500" />}
-                          {isPending && <Clock size={16} className="text-amber-500 animate-spin-slow" />}
+                          {isPending && <Clock size={16} className="text-amber-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">

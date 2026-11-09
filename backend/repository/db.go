@@ -1062,19 +1062,25 @@ func (db *DB) RejectBKReport(ctx context.Context, id int, rejectedBy int, reject
 
 func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan string) (*models.NotificationResponse, error) {
 	var whereClause string
-	if role == "admin" {
+	switch {
+	case role == "admin":
 		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr')"
-	} else if jabatan == "spv" {
+	case role == "ts" && jabatan == "spv":
 		whereClause = "r.status = 'waiting_spv'"
-	} else if jabatan == "mgr" {
+	case role == "ts" && jabatan == "mgr":
 		whereClause = "r.status = 'waiting_mgr'"
-	} else {
-		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr', 'rejected', 'approved')"
+	case role == "ts" && jabatan == "staff":
+		whereClause = "r.status = 'rejected'"
+	default:
+		// Non-TS (produksi/qa/ppic) tidak punya notifikasi approval
+		return &models.NotificationResponse{PendingCount: 0, Items: []models.ApprovalNotificationItem{}}, nil
 	}
 
 	query := fmt.Sprintf(`
 		SELECT r.id, r.kode_produk, COALESCE(p.nama_produk,''), r.no_batch,
-		       COALESCE(u.full_name,''), r.created_at, COALESCE(r.status, 'draft'), r.updated_at, COALESCE(r.reject_note, '')
+		       COALESCE(u.full_name,''), r.created_at, COALESCE(r.status, 'draft'),
+		       r.updated_at, COALESCE(r.reject_note, ''),
+		       COALESCE(r.rejected_by_name, '')
 		FROM bk_reports r
 		LEFT JOIN bk_products p ON p.kode_produk = r.kode_produk
 		LEFT JOIN users u ON u.id = r.created_by
@@ -1095,16 +1101,12 @@ func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan
 		var it models.ApprovalNotificationItem
 		if err := rows.Scan(
 			&it.ID, &it.KodeProduk, &it.NamaProduk, &it.NoBatch,
-			&it.CreatedByName, &it.CreatedAt, &it.Status, &it.UpdatedAt, &it.RejectNote,
+			&it.CreatedByName, &it.CreatedAt, &it.Status, &it.UpdatedAt,
+			&it.RejectNote, &it.RejectedByName,
 		); err != nil {
 			return nil, err
 		}
-		if (jabatan == "spv" && it.Status == "waiting_spv") ||
-		   (jabatan == "mgr" && it.Status == "waiting_mgr") ||
-		   (role == "admin" && (it.Status == "waiting_spv" || it.Status == "waiting_mgr")) ||
-		   (jabatan == "staff" && it.Status == "rejected") {
-			pendingCount++
-		}
+		pendingCount++
 		items = append(items, it)
 	}
 

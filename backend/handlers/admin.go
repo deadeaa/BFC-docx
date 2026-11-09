@@ -19,7 +19,6 @@ func NewAdminHandler(db *repository.DB) *AdminHandler {
 	return &AdminHandler{db: db}
 }
 
-
 func (h *AdminHandler) ListBKProducts(c *gin.Context) {
 	products, err := h.db.ListBKProductsFull(c)
 	if err != nil {
@@ -116,7 +115,7 @@ func (h *AdminHandler) DeleteBKProduct(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListBOProducts(c *gin.Context) {
-	products, err := h.db.ListBOProductsFull(c) 
+	products, err := h.db.ListBOProductsFull(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal mengambil data produk: " + err.Error()})
 		return

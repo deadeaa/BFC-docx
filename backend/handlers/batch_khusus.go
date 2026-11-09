@@ -23,13 +23,15 @@ func NewBatchKhususHandler(db *repository.DB) *BatchKhususHandler {
 	return &BatchKhususHandler{db: db}
 }
 
+// ─── Helper ────────────────────────────────────────────────────────────────
+
 func computeBKMaterialValues(product *models.BKProduct, inputSisaMinor float64) []float64 {
 	if product == nil || len(product.Materials) == 0 {
 		return []float64{}
 	}
 
 	values := make([]float64, len(product.Materials))
-	
+
 	var d4 float64 = 1.0
 	for _, m := range product.Materials {
 		if m.MaterialIndex == 1 {
@@ -63,6 +65,28 @@ func computeBKMaterialValues(product *models.BKProduct, inputSisaMinor float64) 
 	return values
 }
 
+func getRoleJabatan(c *gin.Context) (role string, jabatan string) {
+	r, _ := c.Get(middleware.CtxRole)
+	role, _ = r.(string)
+	j, _ := c.Get(middleware.CtxJabatan)
+	jabatan, _ = j.(string)
+	return
+}
+
+func isStaffTS(role, jabatan string) bool {
+	return role == "ts" && jabatan == "staff"
+}
+
+func isSPV(role, jabatan string) bool {
+	return role == "ts" && jabatan == "spv"
+}
+
+func isMGR(role, jabatan string) bool {
+	return role == "ts" && jabatan == "mgr"
+}
+
+// ─── Product endpoints ─────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) ListProducts(c *gin.Context) {
 	products, err := h.db.ListBKProducts(c)
 	if err != nil {
@@ -77,24 +101,12 @@ func (h *BatchKhususHandler) ListProducts(c *gin.Context) {
 
 func (h *BatchKhususHandler) GetProduct(c *gin.Context) {
 	kode := c.Param("kode")
-	
+
 	product, err := h.db.GetBKProductFullByKode(c, kode)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Produk tidak ditemukan"})
 		return
 	}
-	
-	// // Ambil role dari context
-	// role, _ := c.Get("role")
-	// roleStr, _ := role.(string)
-	
-	// // Jika user (bukan admin), hapus qty_per_sachet dari response
-	// if roleStr != "admin" {
-	// 	for i := range product.Materials {
-	// 		product.Materials[i].QtyPerSachet = 0
-	// 	}
-	// }
-	
 	c.JSON(http.StatusOK, product)
 }
 
@@ -123,6 +135,8 @@ func (h *BatchKhususHandler) GetLatestReport(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
+// ─── Create ────────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 	var req models.CreateBKReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -143,7 +157,7 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 	}
 
 	materialValues := computeBKMaterialValues(product, req.InputSisaMinor)
-	
+
 	var total float64
 	for _, v := range materialValues {
 		total += v
@@ -158,10 +172,17 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 	}
 	detailJSON, _ := json.Marshal(detailData)
 
-	userID, _ := c.Get("user_id")
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
 
+	// Status default = draft. Kalau user minta submit langsung, validasi role.
 	status := "draft"
 	if req.Status == "waiting_spv" {
+		role, jabatan := getRoleJabatan(c)
+		if role != "admin" && !isStaffTS(role, jabatan) {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Staff Technical Services atau Administrator yang dapat mengajukan approval"})
+			return
+		}
 		status = "waiting_spv"
 	}
 
@@ -172,7 +193,7 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 		BobotTotal:     req.BobotTotal,
 		InputSisaMinor: req.InputSisaMinor,
 		DetailJSON:     string(detailJSON),
-		CreatedBy:      userID.(int),
+		CreatedBy:      uid,
 		Status:         status,
 	}
 
@@ -195,6 +216,8 @@ func (h *BatchKhususHandler) CreateReport(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
+// ─── Read one ──────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) GetReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -211,6 +234,8 @@ func (h *BatchKhususHandler) GetReport(c *gin.Context) {
 	c.JSON(http.StatusOK, rep)
 }
 
+// ─── Update ────────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) UpdateReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -218,12 +243,10 @@ func (h *BatchKhususHandler) UpdateReport(c *gin.Context) {
 		return
 	}
 
-	role, _ := c.Get(middleware.CtxRole)
-	roleStr, _ := role.(string)
-	jabatan, _ := c.Get(middleware.CtxJabatan)
-	jabatanStr, _ := jabatan.(string)
+	role, jabatan := getRoleJabatan(c)
 
-	if roleStr != "admin" && jabatanStr == "mgr" {
+	// MGR tidak boleh edit
+	if role != "admin" && isMGR(role, jabatan) {
 		c.JSON(http.StatusForbidden, gin.H{"message": "Manager tidak diizinkan mengubah isi perhitungan"})
 		return
 	}
@@ -232,6 +255,22 @@ func (h *BatchKhususHandler) UpdateReport(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
 		return
+	}
+
+	// Status terkunci
+	if existing.Status == "waiting_mgr" || existing.Status == "approved" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Laporan pada status " + existing.Status + " tidak dapat diubah",
+		})
+		return
+	}
+
+	// waiting_spv hanya boleh diedit oleh SPV / admin
+	if existing.Status == "waiting_spv" {
+		if role != "admin" && !isSPV(role, jabatan) {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor atau Administrator yang dapat mengubah laporan pada status ini"})
+			return
+		}
 	}
 
 	var req models.UpdateBKReportRequest
@@ -277,10 +316,18 @@ func (h *BatchKhususHandler) UpdateReport(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
+// ─── Submit ────────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) SubmitReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	role, jabatan := getRoleJabatan(c)
+	if role != "admin" && !isStaffTS(role, jabatan) {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Staff Technical Services atau Administrator yang dapat mengajukan approval"})
 		return
 	}
 
@@ -311,6 +358,8 @@ func (h *BatchKhususHandler) SubmitReport(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
+// ─── Approve ───────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -318,10 +367,7 @@ func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 		return
 	}
 
-	role, _ := c.Get(middleware.CtxRole)
-	roleStr, _ := role.(string)
-	jabatan, _ := c.Get(middleware.CtxJabatan)
-	jabatanStr, _ := jabatan.(string)
+	role, jabatan := getRoleJabatan(c)
 	userID, _ := c.Get(middleware.CtxUserID)
 	uid, _ := userID.(int)
 
@@ -337,9 +383,10 @@ func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 		return
 	}
 
-	if existing.Status == "waiting_spv" || (roleStr == "admin" && existing.Status == "draft") {
-		// SPV approval step
-		if roleStr != "admin" && jabatanStr != "spv" {
+	switch existing.Status {
+	case "waiting_spv":
+		// Hanya SPV atau admin
+		if role != "admin" && !isSPV(role, jabatan) {
 			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor (SPV) atau Administrator yang dapat menyetujui tahap ini"})
 			return
 		}
@@ -347,9 +394,10 @@ func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyetujui laporan: " + err.Error()})
 			return
 		}
-	} else if existing.Status == "waiting_mgr" {
-		// MGR approval step
-		if roleStr != "admin" && jabatanStr != "mgr" {
+
+	case "waiting_mgr":
+		// Hanya MGR atau admin
+		if role != "admin" && !isMGR(role, jabatan) {
 			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Manager (MGR) atau Administrator yang dapat menyetujui tahap akhir ini"})
 			return
 		}
@@ -357,10 +405,16 @@ func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyetujui laporan: " + err.Error()})
 			return
 		}
-	} else if existing.Status == "approved" {
+
+	case "approved":
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Laporan sudah disetujui (Approved)"})
 		return
-	} else {
+
+	case "rejected":
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Laporan berstatus ditolak, harus diajukan ulang oleh Staff"})
+		return
+
+	default:
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Status laporan belum dalam antrean approval SPV/MGR"})
 		return
 	}
@@ -376,6 +430,8 @@ func (h *BatchKhususHandler) ApproveReport(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
+// ─── Reject ────────────────────────────────────────────────────────────────
+
 func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -383,14 +439,8 @@ func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
 		return
 	}
 
-	role, _ := c.Get(middleware.CtxRole)
-	roleStr, _ := role.(string)
-	jabatan, _ := c.Get(middleware.CtxJabatan)
-	jabatanStr, _ := jabatan.(string)
-	userID, _ := c.Get(middleware.CtxUserID)
-	uid, _ := userID.(int)
-
-	if roleStr != "admin" && jabatanStr != "spv" && jabatanStr != "mgr" {
+	role, jabatan := getRoleJabatan(c)
+	if role != "admin" && !isSPV(role, jabatan) && !isMGR(role, jabatan) {
 		c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor atau Manager yang dapat menolak perhitungan"})
 		return
 	}
@@ -401,6 +451,9 @@ func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
 		return
 	}
 
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
+
 	user, err := h.db.GetUserByID(c, uid)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "User tidak valid"})
@@ -410,6 +463,23 @@ func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
 	existing, err := h.db.GetBKReportByID(c, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Report tidak ditemukan"})
+		return
+	}
+
+	// Validasi status: harus waiting_spv (untuk SPV) atau waiting_mgr (untuk MGR)
+	switch existing.Status {
+	case "waiting_spv":
+		if role != "admin" && !isSPV(role, jabatan) {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Supervisor atau Administrator yang dapat menolak tahap ini"})
+			return
+		}
+	case "waiting_mgr":
+		if role != "admin" && !isMGR(role, jabatan) {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Hanya Manager atau Administrator yang dapat menolak tahap ini"})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Laporan tidak dalam antrean approval"})
 		return
 	}
 
@@ -429,13 +499,12 @@ func (h *BatchKhususHandler) RejectReport(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
-func (h *BatchKhususHandler) GetNotifications(c *gin.Context) {
-	role, _ := c.Get(middleware.CtxRole)
-	roleStr, _ := role.(string)
-	jabatan, _ := c.Get(middleware.CtxJabatan)
-	jabatanStr, _ := jabatan.(string)
+// ─── Notifications ─────────────────────────────────────────────────────────
 
-	resp, err := h.db.GetPendingApprovalNotifications(c, roleStr, jabatanStr)
+func (h *BatchKhususHandler) GetNotifications(c *gin.Context) {
+	role, jabatan := getRoleJabatan(c)
+
+	resp, err := h.db.GetPendingApprovalNotifications(c, role, jabatan)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memuat notifikasi"})
 		return
@@ -443,6 +512,8 @@ func (h *BatchKhususHandler) GetNotifications(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+// ─── List ──────────────────────────────────────────────────────────────────
 
 func (h *BatchKhususHandler) ListReports(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -471,6 +542,8 @@ func (h *BatchKhususHandler) ListReports(c *gin.Context) {
 		PageSize: pageSize,
 	})
 }
+
+// ─── Delete ────────────────────────────────────────────────────────────────
 
 func (h *BatchKhususHandler) DeleteReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))

@@ -52,7 +52,7 @@ function writeStorage(key: string, value: boolean) {
 }
 
 export default function Sidebar() {
-  const { logout, hasRole } = useAuth()
+  const { logout, hasRole, user } = useAuth()
   const { theme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -65,7 +65,11 @@ export default function Sidebar() {
 
   const canCalc = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
   const canReport = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
-  const isAdmin = hasRole('admin', 'ts')
+
+  // Admin (kelola produk BK/BO): admin murni + TS staff
+  const isPureAdmin = user?.role === 'admin'
+  const isTSStaff = user?.role === 'ts' && user?.jabatan === 'staff'
+  const canAccessAdminProducts = isPureAdmin || isTSStaff
 
   const canDownloadReport = hasRole('admin', 'ts')
 
@@ -184,7 +188,8 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isAdmin && (
+        {/* Menu Admin (kelola produk BK/BO): admin murni + TS staff */}
+        {canAccessAdminProducts && (
           <div>
             {collapsed ? (
               adminItems.map((item) => (
@@ -216,7 +221,8 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isAdmin && (
+        {/* Template Report — HANYA admin murni */}
+        {isPureAdmin && (
           <div className="pt-2">
             {collapsed ? (
               <TooltipLink item={{ name: 'Template Report', path: '/admin/report-templates' }} icon={<FileText size={20} />} />
@@ -236,7 +242,8 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isAdmin && (
+        {/* Manajemen — HANYA admin murni */}
+        {isPureAdmin && (
           <div className="pt-2 space-y-1">
             {!collapsed && (
               <p className="px-4 text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1">

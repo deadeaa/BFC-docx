@@ -96,10 +96,16 @@ func main() {
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
 			calcGroup.PUT("/batch-khusus/reports/:id", bkHandler.UpdateReport)
-			calcGroup.POST("/batch-khusus/reports/:id/submit", bkHandler.SubmitReport)
-			calcGroup.POST("/batch-khusus/reports/:id/approve", bkHandler.ApproveReport)
-			calcGroup.POST("/batch-khusus/reports/:id/reject", bkHandler.RejectReport)
 			calcGroup.POST("/batch-overfilled/reports", boHandler.CreateReport)
+		}
+
+		protected.POST("/batch-khusus/reports/:id/submit",
+			middleware.RequireTSStaffOrAdmin(), bkHandler.SubmitReport)
+
+		approverGroup := protected.Group("", middleware.RequireApprover())
+		{
+			approverGroup.POST("/batch-khusus/reports/:id/approve", bkHandler.ApproveReport)
+			approverGroup.POST("/batch-khusus/reports/:id/reject", bkHandler.RejectReport)
 		}
 
 		adminGroup := protected.Group("", middleware.AdminOrTSOnly())

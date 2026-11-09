@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History,
+  Send, CheckCheck, XCircle, FileCheck, Plus,
+} from 'lucide-react'
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
 import HistoryModalBK from '../../components/HistoryModalBK'
 import { useAuth } from '../../context/AuthContext'
+import type { User, BKReport, BKReportStatus } from '../../types'
+import stampApproved from '../../assets/approve.png'
+import stampRejected from '../../assets/reject.png'
 
 interface BKMaterial {
   id: number
@@ -36,18 +43,7 @@ interface ProductOption {
   nama_produk: string
 }
 
-interface BKReport {
-  id: number
-  kode_produk: string
-  nama_produk?: string
-  no_batch: string
-  tgl_pembuatan: string
-  bobot_total: number
-  input_sisa_minor: number
-  created_by: number
-  created_by_name?: string
-  created_at: string
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v == null || isNaN(v)) return '-'
@@ -63,19 +59,84 @@ function formatDateForFilename(date: string): string {
   return date.replace(/-/g, '/')
 }
 
+function canEditReport(user: User | null, status: BKReportStatus | undefined): boolean {
+  if (!user) return false
+  const isAdmin = user.role === 'admin'
+  const isTS = user.role === 'ts'
+  const isSPV = isTS && user.jabatan === 'spv'
+  const isMGR = isTS && user.jabatan === 'mgr'
+  const isStaff = isTS && user.jabatan === 'staff'
+
+  if (isMGR) return false
+  if (status === 'waiting_mgr' || status === 'approved') return false
+  if (isAdmin) return true
+  if (status === 'draft' || status === 'rejected') return isStaff || isSPV
+  if (status === 'waiting_spv') return isSPV
+  return false
+}
+
+function canSubmitReport(user: User | null, status: BKReportStatus | undefined): boolean {
+  if (!user) return false
+  if (status !== 'draft' && status !== 'rejected') return false
+  const isAdmin = user.role === 'admin'
+  const isStaff = user.role === 'ts' && user.jabatan === 'staff'
+  return isAdmin || isStaff
+}
+
+function canApproveSPV(user: User | null, status: BKReportStatus | undefined): boolean {
+  if (!user || status !== 'waiting_spv') return false
+  return user.role === 'admin' || (user.role === 'ts' && user.jabatan === 'spv')
+}
+
+function canApproveMGR(user: User | null, status: BKReportStatus | undefined): boolean {
+  if (!user || status !== 'waiting_mgr') return false
+  return user.role === 'admin' || (user.role === 'ts' && user.jabatan === 'mgr')
+}
+
+function canRejectReport(user: User | null, status: BKReportStatus | undefined): boolean {
+  if (!user) return false
+  if (status !== 'waiting_spv' && status !== 'waiting_mgr') return false
+  return (
+    user.role === 'admin' ||
+    (user.role === 'ts' && (user.jabatan === 'spv' || user.jabatan === 'mgr'))
+  )
+}
+
+// ── Konversi gambar stempel ke base64 (untuk PDF) ─────────────────────────
+async function imageToDataUrl(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas tidak didukung'))
+        return
+      }
+      ctx.drawImage(img, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('Gagal memuat gambar stempel'))
+    img.src = src
+  })
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
+
 export default function BatchKhususPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { user } = useAuth()
-
-  const isAdmin = user?.role === 'admin' || user?.role === 'ts'
+  const [searchParams] = useSearchParams()
 
   const [productList, setProductList] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
   const [jenisProduk, setJenisProduk] = useState<'ruah' | 'minor' | ''>('')
   const [product, setProduct] = useState<BKProduct | null>(null)
   const [loadingProduct, setLoadingProduct] = useState(false)
-  const [loadingLatest, setLoadingLatest] = useState(false)
 
   const [inputRaw, setInputRaw] = useState<string>('')
   const [noBatch, setNoBatch] = useState<string>('')
@@ -85,7 +146,15 @@ export default function BatchKhususPage() {
   const [saveError, setSaveError] = useState('')
 
   const [savedReport, setSavedReport] = useState<BKReport | null>(null)
-  const [dataChanged, setDataChanged] = useState(false)  
+  const [dataChanged, setDataChanged] = useState(false)
+  const [reportStatus, setReportStatus] = useState<BKReportStatus>('draft')
+  const [approvalInfo, setApprovalInfo] = useState<BKReport | null>(null)
+
+  const [submitting, setSubmitting] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [actionSuccess, setActionSuccess] = useState('')
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectNote, setRejectNote] = useState('')
 
   const [latestReport, setLatestReport] = useState<BKReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -93,6 +162,9 @@ export default function BatchKhususPage() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [filterNoBatch, setFilterNoBatch] = useState<string>('')
 
+  const userIsAdmin = user?.role === 'admin' || user?.role === 'ts'
+
+  // ── Load product list sekali
   useEffect(() => {
     api.get<ProductOption[]>('/batch-khusus/products')
       .then(res => setProductList(res.data))
@@ -101,39 +173,55 @@ export default function BatchKhususPage() {
 
   const filteredProducts = productList.filter((p) => {
     const kode = p.kode_produk.toUpperCase()
-    
-    if (jenisProduk === 'ruah') {
-      return kode.startsWith('P') || kode.startsWith('B')
-    } else if (jenisProduk === 'minor') {
-      return kode.startsWith('X')
-    }
-    
+    if (jenisProduk === 'ruah') return kode.startsWith('P') || kode.startsWith('B')
+    if (jenisProduk === 'minor') return kode.startsWith('X')
     return true
   })
+
+  const resetReportState = () => {
+    setSavedReport(null)
+    setReportStatus('draft')
+    setApprovalInfo(null)
+    setDataChanged(false)
+    setInputRaw('')
+    setNoBatch('')
+    setSaveError('')
+    setSaveSuccess(false)
+    setActionError('')
+    setActionSuccess('')
+  }
 
   const handleJenisProdukChange = (value: 'ruah' | 'minor' | '') => {
     setJenisProduk(value)
     setSelectedKode('')
     setProduct(null)
     setLatestReport(null)
+    resetReportState()
+    setFilterNoBatch('')
+    setHistoryData([])
+  }
+
+  // ── Buat perhitungan baru: reset form tapi tetap di kode produk yang sama
+  const handleCreateNew = () => {
     setSavedReport(null)
+    setApprovalInfo(null)
+    setReportStatus('draft')
     setDataChanged(false)
     setInputRaw('')
     setNoBatch('')
-    setSaveSuccess(false)
     setSaveError('')
-    setFilterNoBatch('')
-    setHistoryData([])
+    setSaveSuccess(false)
+    setActionError('')
+    setActionSuccess('')
   }
 
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
     if (!targetKode) return
-
     setLoadingHistory(true)
     try {
       const res = await api.get<BKReport[]>(`/batch-khusus/reports/product/${targetKode}`, {
-        params: { no_batch: filterNoBatch || undefined }
+        params: { no_batch: filterNoBatch || undefined },
       })
       setHistoryData(res.data || [])
     } catch {
@@ -143,24 +231,17 @@ export default function BatchKhususPage() {
     }
   }, [selectedKode, filterNoBatch])
 
-  const handleSelectKode = useCallback(async (kode: string) => {
+  const handleSelectKode = useCallback(async (kode: string): Promise<void> => {
     setSelectedKode(kode)
     setProduct(null)
     setLatestReport(null)
-    setSavedReport(null)
-    setDataChanged(false)
-    setInputRaw('')
-    setNoBatch('')
-    setSaveSuccess(false)
-    setSaveError('')
+    resetReportState()
     setFilterNoBatch('')
     setHistoryData([])
 
     if (!kode) return
 
     setLoadingProduct(true)
-    setLoadingLatest(true)
-
     try {
       const productRes = await api.get<BKProduct>(`/batch-khusus/products/${kode}`)
       setProduct(productRes.data)
@@ -171,22 +252,70 @@ export default function BatchKhususPage() {
           setLatestReport(reportRes.data)
           setInputRaw(reportRes.data.input_sisa_minor?.toString() || '')
           setNoBatch(reportRes.data.no_batch || '')
-          setSavedReport(reportRes.data)  
+          setSavedReport(reportRes.data)
+          setApprovalInfo(reportRes.data)
+          setReportStatus(reportRes.data.status ?? 'draft')
           setDataChanged(false)
         }
       } catch {
+        // belum ada laporan
       }
 
       await loadHistory(kode)
-
     } catch {
       setSaveError('Gagal memuat data produk. Coba pilih ulang.')
     } finally {
       setLoadingProduct(false)
-      setLoadingLatest(false)
     }
   }, [loadHistory])
 
+  // ── Auto-load dari query param (?kode=...&report=...&no_batch=...)
+  useEffect(() => {
+    const kode = searchParams.get('kode')
+    const reportId = searchParams.get('report')
+    const noBatchQuery = searchParams.get('no_batch')
+    if (!kode) return
+
+    const isMinor = kode.toUpperCase().startsWith('X')
+    setJenisProduk(isMinor ? 'minor' : 'ruah')
+
+    handleSelectKode(kode).then(() => {
+      if (reportId) {
+        api.get<BKReport>(`/batch-khusus/reports/single/${reportId}`)
+          .then(res => {
+            setInputRaw(res.data.input_sisa_minor?.toString() || '')
+            setNoBatch(res.data.no_batch || '')
+            setLatestReport(res.data)
+            setSavedReport(res.data)
+            setApprovalInfo(res.data)
+            setReportStatus(res.data.status ?? 'draft')
+            setDataChanged(false)
+          })
+          .catch(() => {})
+      } else if (noBatchQuery) {
+        api.get<BKReport[]>(`/batch-khusus/reports/product/${kode}`, {
+          params: { no_batch: noBatchQuery },
+        })
+          .then(res => {
+            const list = res.data || []
+            if (list.length > 0) {
+              const rep = list[0]
+              setInputRaw(rep.input_sisa_minor?.toString() || '')
+              setNoBatch(rep.no_batch || '')
+              setLatestReport(rep)
+              setSavedReport(rep)
+              setApprovalInfo(rep)
+              setReportStatus(rep.status ?? 'draft')
+              setDataChanged(false)
+            }
+          })
+          .catch(() => {})
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // ── Perhitungan
   const d5 = parseFloat(inputRaw) || 0
 
   function computeMaterialValues(): number[] {
@@ -210,9 +339,9 @@ export default function BatchKhususPage() {
 
   function computeRangeValues(): { min: number[]; max: number[] } {
     if (!product || d5 <= 0) {
-      return { 
-        min: product?.materials.map(() => 0) || [], 
-        max: product?.materials.map(() => 0) || [] 
+      return {
+        min: product?.materials.map(() => 0) || [],
+        max: product?.materials.map(() => 0) || [],
       }
     }
     const minValues = materialValues.map((v, i) => v - product.materials[i].range_min)
@@ -223,11 +352,10 @@ export default function BatchKhususPage() {
   const rangeValues = computeRangeValues()
 
   useEffect(() => {
-    if (selectedKode && showHistory) {
-      loadHistory(selectedKode)
-    }
+    if (selectedKode && showHistory) loadHistory(selectedKode)
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
+  // ── Simpan
   async function handleSave() {
     if (!product) {
       setSaveError('Pilih produk terlebih dahulu.')
@@ -245,54 +373,159 @@ export default function BatchKhususPage() {
     setSaveError('')
     setSaveSuccess(false)
     try {
-      const res = await api.post<BKReport>('/batch-khusus/reports', {
-        kode_produk: product.kode_produk,
-        no_batch: noBatch.trim(),
-        tgl_pembuatan: tglPembuatan,
-        bobot_total: parseFloat(total.toFixed(4)),
-        input_sisa_minor: d5,
-      })
+      if (savedReport && (reportStatus === 'draft' || reportStatus === 'rejected')) {
+        const res = await api.put<BKReport>(`/batch-khusus/reports/${savedReport.id}`, {
+          bobot_total: parseFloat(total.toFixed(4)),
+          input_sisa_minor: d5,
+        })
+        setSavedReport(res.data)
+        setApprovalInfo(res.data)
+        setReportStatus(res.data.status)
+      } else {
+        const res = await api.post<BKReport>('/batch-khusus/reports', {
+          kode_produk: product.kode_produk,
+          no_batch: noBatch.trim(),
+          tgl_pembuatan: tglPembuatan,
+          bobot_total: parseFloat(total.toFixed(4)),
+          input_sisa_minor: d5,
+          status: 'draft',
+        })
+        setSavedReport(res.data)
+        setLatestReport(res.data)
+        setApprovalInfo(res.data)
+        setReportStatus(res.data.status ?? 'draft')
+      }
       setSaveSuccess(true)
-      setLatestReport(res.data)
-      setSavedReport(res.data)
-      setDataChanged(false)  
+      setDataChanged(false)
       setTimeout(() => setSaveSuccess(false), 4000)
-    } catch {
-      setSaveError('Gagal menyimpan. Coba lagi.')
+      await loadHistory()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setSaveError(msg ?? 'Gagal menyimpan. Coba lagi.')
     } finally {
       setSaving(false)
     }
   }
 
-  const isExportable = 
-    !!product 
-    && d5 > 0 
-    && !!savedReport 
-    && savedReport.no_batch === noBatch.trim()
-    && !dataChanged
+  // ── Submit approval
+  async function handleSubmitApproval() {
+    if (!savedReport) {
+      setActionError('Simpan laporan terlebih dahulu')
+      return
+    }
+    setSubmitting(true)
+    setActionError('')
+    setActionSuccess('')
+    try {
+      const res = await api.post<BKReport>(`/batch-khusus/reports/${savedReport.id}/submit`)
+      setSavedReport(res.data)
+      setApprovalInfo(res.data)
+      setReportStatus(res.data.status)
+      setDataChanged(false)
+      setActionSuccess('Laporan berhasil diajukan ke Supervisor')
+      setTimeout(() => setActionSuccess(''), 4000)
+      await loadHistory()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setActionError(msg ?? 'Gagal mengajukan approval')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
-  function handleExportPDF() {
+  // ── Approve
+  async function handleApprove() {
+    if (!savedReport) return
+    setSubmitting(true)
+    setActionError('')
+    setActionSuccess('')
+    try {
+      const res = await api.post<BKReport>(`/batch-khusus/reports/${savedReport.id}/approve`)
+      setSavedReport(res.data)
+      setApprovalInfo(res.data)
+      setReportStatus(res.data.status)
+      setActionSuccess(
+        res.data.status === 'approved'
+          ? 'Laporan disetujui oleh Manager'
+          : 'Laporan disetujui oleh Supervisor, menunggu Manager'
+      )
+      setTimeout(() => setActionSuccess(''), 4000)
+      await loadHistory()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setActionError(msg ?? 'Gagal approve')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Reject
+  async function handleReject() {
+    if (!savedReport || !rejectNote.trim()) {
+      setActionError('Catatan penolakan wajib diisi')
+      return
+    }
+    setSubmitting(true)
+    setActionError('')
+    setActionSuccess('')
+    try {
+      const res = await api.post<BKReport>(`/batch-khusus/reports/${savedReport.id}/reject`, {
+        reject_note: rejectNote.trim(),
+      })
+      setSavedReport(res.data)
+      setApprovalInfo(res.data)
+      setReportStatus(res.data.status)
+      setShowRejectModal(false)
+      setRejectNote('')
+      setActionSuccess('Laporan ditolak, dikembalikan ke Staff')
+      setTimeout(() => setActionSuccess(''), 4000)
+      await loadHistory()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setActionError(msg ?? 'Gagal reject')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Export
+  const isExportable =
+    !!product &&
+    d5 > 0 &&
+    !!savedReport &&
+    savedReport.no_batch === noBatch.trim() &&
+    !dataChanged
+
+  async function handleExportPDF() {
     if (!product || d5 <= 0) return
-    
     if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
       setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
       return
     }
-    
     if (dataChanged) {
       setSaveError('⚠️ Data telah diubah. Simpan ulang sebelum export PDF')
       return
     }
-    
+
     const createdBy = user?.full_name || user?.username || 'User'
     const dateStr = formatDateForFilename(tglPembuatan)
     const filename = `Calculation_Batch_Khusus_${dateStr}`
+
+    // Encode gambar stempel ke base64 untuk PDF
+    let approvedB64 = ''
+    let rejectedB64 = ''
+    try {
+      approvedB64 = await imageToDataUrl(stampApproved)
+      rejectedB64 = await imageToDataUrl(stampRejected)
+    } catch {
+      // lanjut tanpa gambar kalau gagal
+    }
 
     const matHeaders = product.materials
       .map(m => `<th>${m.kode_material}</th>`).join('')
 
     let rowQty = ''
-    if (isAdmin) {
+    if (userIsAdmin) {
       rowQty = `
       <tr>
         <td colspan="2" class="label">Qty/sachet</td>
@@ -343,6 +576,54 @@ export default function BatchKhususPage() {
 
     const tglFmt = new Date(tglPembuatan + 'T00:00:00')
       .toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+
+    // Build stempel section
+    const stampParts: string[] = []
+
+    if (approvalInfo?.spv_name && approvedB64) {
+      stampParts.push(`
+        <div style="display:inline-block; text-align:center; margin-right:32px; vertical-align:top;">
+          <img src="${approvedB64}" alt="Approved SPV"
+               style="width:120px; height:120px; object-fit:contain; transform:rotate(-30deg);" />
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#166534;">${approvalInfo.spv_name}</div>
+          <div style="font-size:10px; color:#666;">Supervisor (SPV)</div>
+          ${approvalInfo.spv_approved_at ? `<div style="font-size:10px; color:#888;">${new Date(approvalInfo.spv_approved_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+        </div>
+      `)
+    }
+
+    if (approvalInfo?.mgr_name && approvedB64) {
+      stampParts.push(`
+        <div style="display:inline-block; text-align:center; margin-right:32px; vertical-align:top;">
+          <img src="${approvedB64}" alt="Approved MGR"
+               style="width:120px; height:120px; object-fit:contain; transform:rotate(-30deg);" />
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#166534;">${approvalInfo.mgr_name}</div>
+          <div style="font-size:10px; color:#666;">Manager (MGR)</div>
+          ${approvalInfo.mgr_approved_at ? `<div style="font-size:10px; color:#888;">${new Date(approvalInfo.mgr_approved_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+        </div>
+      `)
+    }
+
+    if (approvalInfo?.status === 'rejected' && rejectedB64) {
+      stampParts.push(`
+        <div style="display:inline-block; text-align:center; margin-right:32px; vertical-align:top;">
+          <img src="${rejectedB64}" alt="Rejected"
+               style="width:120px; height:120px; object-fit:contain; transform:rotate(-30deg);" />
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#dc2626;">${approvalInfo.rejected_by_name || '-'}</div>
+          <div style="font-size:10px; color:#666;">Ditolak</div>
+          ${approvalInfo.rejected_at ? `<div style="font-size:10px; color:#888;">${new Date(approvalInfo.rejected_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+          ${approvalInfo.reject_note ? `<div style="font-size:10px; font-style:italic; color:#b91c1c; margin-top:4px; max-width:180px;">"${approvalInfo.reject_note}"</div>` : ''}
+        </div>
+      `)
+    }
+
+    const approvalStamp = stampParts.length > 0 ? `
+      <div style="margin-top:24px; padding:12px; border:1px solid #ccc; border-radius:6px;">
+        <div style="font-size:11px; text-transform:uppercase; color:#666; margin-bottom:12px; letter-spacing:.05em;">Stempel Approval</div>
+        <div style="display:flex; flex-wrap:wrap; gap:24px;">
+          ${stampParts.join('')}
+        </div>
+      </div>` : ''
 
     const html = `<!DOCTYPE html>
 <html lang="id">
@@ -399,6 +680,7 @@ export default function BatchKhususPage() {
     ${rowsRendemen}
   </tbody>
 </table>
+${approvalStamp}
 <div class="footer">File: ${filename}</div>
 </body>
 </html>`
@@ -411,6 +693,7 @@ export default function BatchKhususPage() {
     win.onload = () => { win.print() }
   }
 
+  // ── Styling helpers
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -442,10 +725,15 @@ export default function BatchKhususPage() {
     isDark ? 'text-gray-400' : 'text-gray-500'
   )
 
+  const editable = canEditReport(user, reportStatus)
+  const canCreateNew = user?.role === 'ts' && user?.jabatan === 'staff'
+
+  // ── Render
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
+      {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <div className="p-2 rounded-lg bg-brand-green/10">
             <Calculator size={20} className="text-brand-green" />
           </div>
@@ -466,55 +754,69 @@ export default function BatchKhususPage() {
         </p>
       </div>
 
+      {/* Jenis & Kode Produk (satu baris) */}
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
-        <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
-          Jenis Produk
-        </label>
-        <div className="relative max-w-xs">
-          <select
-            value={jenisProduk}
-            onChange={(e) => handleJenisProdukChange(e.target.value as 'ruah' | 'minor' | '')}
-            className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
-          >
-            <option value="">-- Pilih Jenis Produk --</option>
-            <option value="ruah">Produk Ruah</option>
-            <option value="minor">Produk Minor</option>
-          </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-        </div>
-        <p className="text-xs text-gray-400 mt-1">
-          {jenisProduk === 'ruah' && '📦 Produk ruah: PEBJ3, PEBJ4, PBSJ1, dll'}
-          {jenisProduk === 'minor' && '🧪 Produk minor: XEBJ3, XEBJ4, XBSJ1, dll'}
-        </p>
-      </div>
-
-      {jenisProduk && (
-        <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
-          <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
-            Kode Produk
-          </label>
-          <div className="relative max-w-xs">
-            <select
-              value={selectedKode}
-              onChange={e => handleSelectKode(e.target.value)}
-              className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
-            >
-              <option value="">-- Pilih Kode Produk --</option>
-              {filteredProducts.map(p => (
-                <option key={p.kode_produk} value={p.kode_produk}>
-                  {p.kode_produk} – {p.nama_produk}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-          </div>
-          {filteredProducts.length === 0 && (
-            <p className="text-xs text-yellow-500 mt-1">
-              ⚠️ Tidak ada produk {jenisProduk} tersedia
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Jenis Produk */}
+          <div>
+            <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
+              Jenis Produk
+            </label>
+            <div className="relative">
+              <select
+                value={jenisProduk}
+                onChange={(e) => handleJenisProdukChange(e.target.value as 'ruah' | 'minor' | '')}
+                className={cn(inputBase, 'pr-9 appearance-none cursor-pointer', isDark ? 'bg-gray-700' : 'bg-white')}
+              >
+                <option value="">-- Pilih Jenis Produk --</option>
+                <option value="ruah">Produk Ruah</option>
+                <option value="minor">Produk Minor</option>
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {jenisProduk === 'ruah' && '📦 Produk ruah: PEBJ3, PEBJ4, PBSJ1, dll'}
+              {jenisProduk === 'minor' && '🧪 Produk minor: XEBJ3, XEBJ4, XBSJ1, dll'}
+              {!jenisProduk && 'Pilih jenis produk terlebih dahulu'}
             </p>
-          )}
+          </div>
+
+          {/* Kode Produk */}
+          <div>
+            <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
+              Kode Produk
+            </label>
+            <div className="relative">
+              <select
+                value={selectedKode}
+                onChange={e => handleSelectKode(e.target.value)}
+                disabled={!jenisProduk}
+                className={cn(
+                  inputBase,
+                  'pr-9 appearance-none cursor-pointer',
+                  isDark ? 'bg-gray-700' : 'bg-white',
+                  !jenisProduk && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <option value="">-- Pilih Kode Produk --</option>
+                {filteredProducts.map(p => (
+                  <option key={p.kode_produk} value={p.kode_produk}>
+                    {p.kode_produk} – {p.nama_produk}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {!jenisProduk
+                ? 'Akan aktif setelah memilih jenis produk'
+                : filteredProducts.length === 0
+                ? `⚠️ Tidak ada produk ${jenisProduk} tersedia`
+                : `${filteredProducts.length} produk tersedia`}
+            </p>
+          </div>
         </div>
-      )}
+      </div>
 
       {loadingProduct && (
         <div className={cn('rounded-xl p-8 text-center shadow-sm', card)}>
@@ -524,7 +826,21 @@ export default function BatchKhususPage() {
       )}
 
       {product && !loadingProduct && (
-        <div className="mb-4 flex justify-end gap-3">
+        <div className="mb-4 flex justify-between gap-3 flex-wrap">
+          {canCreateNew ? (
+            <button
+              onClick={handleCreateNew}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all',
+                'bg-brand-green hover:bg-brand-green/90 text-white'
+              )}
+            >
+              <Plus size={16} />
+              Buat Perhitungan Baru
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={() => {
               loadHistory()
@@ -548,6 +864,7 @@ export default function BatchKhususPage() {
 
       {product && !loadingProduct && (
         <>
+          {/* Tabel perhitungan */}
           <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
@@ -573,7 +890,7 @@ export default function BatchKhususPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isAdmin && (
+                  {userIsAdmin && (
                     <tr className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                       <td className={cn('px-3 py-2.5 font-medium text-sm', isDark ? 'text-gray-200' : 'text-gray-700')} colSpan={2}>
                         Qty/sachet
@@ -615,11 +932,12 @@ export default function BatchKhususPage() {
                             inputMode="decimal"
                             placeholder="0"
                             value={inputRaw}
+                            disabled={!editable}
                             onChange={e => {
                               setInputRaw(e.target.value)
-                              setDataChanged(true)  
+                              setDataChanged(true)
                             }}
-                            className={greenInput}
+                            className={cn(greenInput, !editable && 'opacity-60 cursor-not-allowed')}
                           />
                         ) : (
                           <div className={cn(calcCell, d5 > 0 ? '' : 'opacity-40')}>
@@ -692,9 +1010,126 @@ export default function BatchKhususPage() {
             </div>
           </div>
 
+          {/* Stempel approval */}
+          {approvalInfo && approvalInfo.status !== 'draft' && (
+            <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
+              <h3 className={cn('text-sm font-semibold mb-3 flex items-center gap-2',
+                isDark ? 'text-gray-200' : 'text-gray-700')}>
+                <FileCheck size={16} className="text-brand-green" />
+                Status &amp; Stempel Approval
+              </h3>
+
+              <div className="mb-4">
+                {approvalInfo.status === 'approved' && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">
+                    <CheckCheck size={12} /> Disetujui
+                  </span>
+                )}
+                {approvalInfo.status === 'waiting_mgr' && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-semibold">
+                    ⏳ Menunggu Manager
+                  </span>
+                )}
+                {approvalInfo.status === 'waiting_spv' && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-semibold">
+                    ⏳ Menunggu SPV
+                  </span>
+                )}
+                {approvalInfo.status === 'rejected' && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold">
+                    <XCircle size={12} /> Ditolak
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-12 items-start">
+                {/* Stempel SPV */}
+                {approvalInfo.spv_name && (
+                  <div className="flex flex-col items-center text-center">
+                    <img
+                      src={stampApproved}
+                      alt="Approved SPV"
+                      className="w-32 h-32 object-contain mb-2 -rotate-[30deg]"
+                    />
+                    <p className={cn('text-sm font-semibold', isDark ? 'text-green-300' : 'text-green-800')}>
+                      {approvalInfo.spv_name}
+                    </p>
+                    <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>
+                      Supervisor (SPV)
+                    </p>
+                    {approvalInfo.spv_approved_at && (
+                      <p className={cn('text-[11px] mt-0.5', isDark ? 'text-gray-500' : 'text-gray-400')}>
+                        {new Date(approvalInfo.spv_approved_at).toLocaleString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Stempel MGR */}
+                {approvalInfo.mgr_name && (
+                  <div className="flex flex-col items-center text-center">
+                    <img
+                      src={stampApproved}
+                      alt="Approved MGR"
+                      className="w-32 h-32 object-contain mb-2 -rotate-[30deg]"
+                    />
+                    <p className={cn('text-sm font-semibold', isDark ? 'text-green-300' : 'text-green-800')}>
+                      {approvalInfo.mgr_name}
+                    </p>
+                    <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>
+                      Manager (MGR)
+                    </p>
+                    {approvalInfo.mgr_approved_at && (
+                      <p className={cn('text-[11px] mt-0.5', isDark ? 'text-gray-500' : 'text-gray-400')}>
+                        {new Date(approvalInfo.mgr_approved_at).toLocaleString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Stempel Reject */}
+                {approvalInfo.status === 'rejected' && (
+                  <div className="flex flex-col items-center text-center">
+                    <img
+                      src={stampRejected}
+                      alt="Rejected"
+                      className="w-32 h-32 object-contain mb-2 -rotate-[30deg]"
+                    />
+                    <p className={cn('text-sm font-semibold', isDark ? 'text-red-300' : 'text-red-800')}>
+                      {approvalInfo.rejected_by_name || '-'}
+                    </p>
+                    <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>
+                      Ditolak
+                    </p>
+                    {approvalInfo.rejected_at && (
+                      <p className={cn('text-[11px] mt-0.5', isDark ? 'text-gray-500' : 'text-gray-400')}>
+                        {new Date(approvalInfo.rejected_at).toLocaleString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    )}
+                    {approvalInfo.reject_note && (
+                      <p className={cn('text-[11px] mt-1 italic max-w-[200px]', isDark ? 'text-red-300' : 'text-red-600')}>
+                        "{approvalInfo.reject_note}"
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Simpan & export */}
           <div className={cn('rounded-xl p-5 shadow-sm', card)}>
             <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
-              Simpan & Export
+              Simpan &amp; Export
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -705,12 +1140,13 @@ export default function BatchKhususPage() {
                 <input
                   type="text"
                   value={noBatch}
+                  disabled={!editable}
                   onChange={e => {
                     setNoBatch(e.target.value)
-                    setDataChanged(true) 
+                    setDataChanged(true)
                   }}
                   placeholder="Contoh: BATCH-001"
-                  className={inputBase}
+                  className={cn(inputBase, !editable && 'opacity-60 cursor-not-allowed')}
                 />
               </div>
               <div>
@@ -725,17 +1161,6 @@ export default function BatchKhususPage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">Otomatis tanggal hari ini</p>
               </div>
-              <div>
-                <label className={cn('block text-xs font-medium mb-1.5', isDark ? 'text-gray-400' : 'text-gray-600')}>
-                  Bobot Total (F5)
-                </label>
-                <div className={cn(
-                  'px-3 py-2 rounded-lg border text-sm font-semibold',
-                  isDark ? 'bg-gray-700/60 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-700'
-                )}>
-                  {d5 > 0 ? fmt(total) : '—'}
-                </div>
-              </div>
             </div>
 
             {saveError && (
@@ -747,14 +1172,27 @@ export default function BatchKhususPage() {
             {saveSuccess && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 mb-4">
                 <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
-                <span className="text-sm text-green-700 dark:text-green-400">Perhitungan berhasil disimpan ke laporan.</span>
+                <span className="text-sm text-green-700 dark:text-green-400">Perhitungan berhasil disimpan.</span>
+              </div>
+            )}
+            {actionError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
+                <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                <span className="text-sm text-red-600 dark:text-red-400">{actionError}</span>
+              </div>
+            )}
+            {actionSuccess && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/30 mb-4">
+                <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
+                <span className="text-sm text-green-700 dark:text-green-400">{actionSuccess}</span>
               </div>
             )}
 
             <div className="flex flex-wrap gap-3">
+              {/* Simpan */}
               <button
                 onClick={handleSave}
-                disabled={saving || !d5 || !noBatch.trim()}
+                disabled={saving || !d5 || !noBatch.trim() || !editable}
                 className={cn(
                   'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -774,6 +1212,56 @@ export default function BatchKhususPage() {
                 )}
               </button>
 
+              {/* Ajukan Approval */}
+              {canSubmitReport(user, reportStatus) && (
+                <button
+                  onClick={handleSubmitApproval}
+                  disabled={submitting || !savedReport || dataChanged || !editable}
+                  title={dataChanged ? 'Simpan perubahan terlebih dahulu' : 'Ajukan ke Supervisor'}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <Send size={16} />
+                  Ajukan Approval ke SPV
+                </button>
+              )}
+
+              {/* Approve SPV */}
+              {canApproveSPV(user, reportStatus) && (
+                <button
+                  onClick={handleApprove}
+                  disabled={submitting || dataChanged}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-all"
+                >
+                  <CheckCheck size={16} />
+                  Approve sebagai SPV
+                </button>
+              )}
+
+              {/* Approve MGR */}
+              {canApproveMGR(user, reportStatus) && (
+                <button
+                  onClick={handleApprove}
+                  disabled={submitting}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-all"
+                >
+                  <CheckCheck size={16} />
+                  Approve sebagai Manager
+                </button>
+              )}
+
+              {/* Reject */}
+              {canRejectReport(user, reportStatus) && (
+                <button
+                  onClick={() => setShowRejectModal(true)}
+                  disabled={submitting}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-all"
+                >
+                  <XCircle size={16} />
+                  Reject
+                </button>
+              )}
+
+              {/* Export PDF */}
               <button
                 onClick={handleExportPDF}
                 disabled={!isExportable}
@@ -789,10 +1277,16 @@ export default function BatchKhususPage() {
               </button>
             </div>
 
+            {!editable && (
+              <p className="text-xs text-gray-400 mt-3">
+                🔒 Perhitungan pada status ini tidak dapat diedit.
+              </p>
+            )}
+
             {d5 > 0 && (!savedReport || dataChanged) && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                ⚠️ {dataChanged 
-                  ? 'Data telah diubah. Simpan ulang sebelum export PDF' 
+                ⚠️ {dataChanged
+                  ? 'Data telah diubah. Simpan ulang sebelum export PDF'
                   : 'Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF'}
               </p>
             )}
@@ -804,6 +1298,7 @@ export default function BatchKhususPage() {
         </>
       )}
 
+      {/* History modal */}
       {showHistory && (
         <HistoryModalBK
           isOpen={showHistory}
@@ -816,13 +1311,53 @@ export default function BatchKhususPage() {
             setNoBatch(report.no_batch || '')
             setLatestReport(report)
             setSavedReport(report)
-            setDataChanged(false)  
+            setApprovalInfo(report)
+            setReportStatus(report.status ?? 'draft')
+            setDataChanged(false)
             setShowHistory(false)
           }}
           filterNoBatch={filterNoBatch}
           onFilterChange={setFilterNoBatch}
           onRefresh={() => loadHistory()}
         />
+      )}
+
+      {/* Reject modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className={cn('w-full max-w-md rounded-2xl shadow-2xl border p-6',
+            isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200')}>
+            <h3 className={cn('font-bold text-lg mb-2', isDark ? 'text-white' : 'text-gray-800')}>
+              Tolak Perhitungan?
+            </h3>
+            <p className={cn('text-sm mb-4', isDark ? 'text-gray-400' : 'text-gray-500')}>
+              Berikan catatan alasan penolakan agar Staff dapat memperbaiki.
+            </p>
+            <textarea
+              value={rejectNote}
+              onChange={e => setRejectNote(e.target.value)}
+              rows={4}
+              placeholder="Contoh: Perhitungan tidak sesuai dengan standar batch"
+              className={inputBase}
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setShowRejectModal(false); setRejectNote('') }}
+                className={cn('flex-1 py-2.5 rounded-xl border text-sm font-medium',
+                  isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={submitting || !rejectNote.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {submitting ? 'Memproses…' : 'Tolak'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

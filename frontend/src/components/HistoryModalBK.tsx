@@ -312,7 +312,4 @@ export default function HistoryModalBK({
     </div>
   )
 }
-      </div>
-    </div>
-  )
-}
+   

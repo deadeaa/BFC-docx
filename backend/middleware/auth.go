@@ -57,18 +57,18 @@ func AdminOrTSOnly() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
 			return
 		}
-		
+
 		roleStr, ok := role.(string)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
 			return
 		}
-		
+
 		if roleStr != "admin" && roleStr != "ts" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Akses ditolak"})
 			return
 		}
-		
+
 		c.Next()
 	}
 }
