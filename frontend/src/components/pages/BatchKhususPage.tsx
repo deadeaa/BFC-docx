@@ -605,12 +605,16 @@ export default function BatchKhususPage() {
     }
 
     if (approvalInfo?.status === 'rejected' && rejectedB64) {
+      // Tentukan siapa yang reject: SPV atau MGR?
+      // spv_name ada → reject di tahap MGR (SPV sudah approve)
+      // spv_name kosong → reject di tahap SPV
+      const rejectorRole = approvalInfo.spv_name ? 'Manager (MGR)' : 'Supervisor (SPV)'
       stampParts.push(`
         <div style="display:inline-block; text-align:center; margin-right:32px; vertical-align:top;">
           <img src="${rejectedB64}" alt="Rejected"
                style="width:120px; height:120px; object-fit:contain; transform:rotate(-30deg);" />
           <div style="margin-top:6px; font-size:12px; font-weight:700; color:#dc2626;">${approvalInfo.rejected_by_name || '-'}</div>
-          <div style="font-size:10px; color:#666;">Ditolak</div>
+          <div style="font-size:10px; color:#666;">${rejectorRole}</div>
           ${approvalInfo.rejected_at ? `<div style="font-size:10px; color:#888;">${new Date(approvalInfo.rejected_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
           ${approvalInfo.reject_note ? `<div style="font-size:10px; font-style:italic; color:#b91c1c; margin-top:4px; max-width:180px;">"${approvalInfo.reject_note}"</div>` : ''}
         </div>
@@ -1105,7 +1109,7 @@ ${approvalStamp}
                       {approvalInfo.rejected_by_name || '-'}
                     </p>
                     <p className={cn('text-xs', isDark ? 'text-gray-400' : 'text-gray-500')}>
-                      Ditolak
+                      {approvalInfo.spv_name ? 'Manager (MGR)' : 'Supervisor (SPV)'}
                     </p>
                     {approvalInfo.rejected_at && (
                       <p className={cn('text-[11px] mt-0.5', isDark ? 'text-gray-500' : 'text-gray-400')}>
