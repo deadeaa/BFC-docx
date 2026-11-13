@@ -2,9 +2,6 @@ import { Link } from 'react-router-dom'
 import { ShieldAlert } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 
-// Ditampilkan ketika user yang sudah login mencoba mengakses route yang
-// tidak diizinkan untuk role-nya (mis. QA/Produksi/PPIC membuka /users atau
-// /log-aktivitas secara manual lewat URL).
 export default function UnauthorizedPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'

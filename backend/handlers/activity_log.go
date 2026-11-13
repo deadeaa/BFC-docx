@@ -18,16 +18,6 @@ func NewActivityLogHandler(db *repository.DB) *ActivityLogHandler {
 	return &ActivityLogHandler{db: db}
 }
 
-// Query params (semua opsional):
-//
-//	search     - pencarian bebas (nama user, menu, aktivitas, deskripsi)
-//	user_name  - filter nama/username (partial match)
-//	role       - filter role (admin/produksi/qa)
-//	activity   - filter aktivitas (partial match)
-//	date_from  - filter tanggal mulai (YYYY-MM-DD)
-//	date_to    - filter tanggal akhir (YYYY-MM-DD)
-//	page       - halaman (default 1)
-//	page_size  - jumlah baris per halaman (default 20, maks 200)
 func (h *ActivityLogHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page < 1 {

@@ -1,13 +1,3 @@
-// frontend/src/components/IdleTimeoutWatcher.tsx
-//
-// Auto Logout berdasarkan waktu idle (tidak ada aktivitas), BUKAN berdasarkan
-// waktu login. Setiap aktivitas user (klik, mouse move, keyboard, scroll,
-// touch, perpindahan halaman) akan me-reset timer idle.
-//
-// Komponen ini tidak mengubah logic login, endpoint login, middleware
-// authentication, maupun role — hanya menambahkan pengecekan idle di sisi
-// frontend dan memanggil fungsi logout yang sudah ada di AuthContext.
-
 import { useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -38,8 +28,8 @@ export default function IdleTimeoutWatcher() {
   }, [])
 
   const clearAuthRelatedStorage = useCallback(() => {
-    // Hapus data yang berkaitan dengan autentikasi saja — data lain (mis.
-    // preferensi tema) sengaja tidak disentuh.
+    
+    
     localStorage.removeItem('access_token')
     localStorage.removeItem(LAST_ACTIVITY_KEY)
     sessionStorage.clear()
@@ -50,11 +40,11 @@ export default function IdleTimeoutWatcher() {
     loggingOutRef.current = true
 
     try {
-      // Memanggil endpoint logout yang sudah ada agar refresh token /
-      // cookie autentikasi di server turut dihapus.
+      
+      
       await logout()
     } catch {
-      // Abaikan error jaringan — tetap lanjutkan pembersihan di sisi client.
+      
     } finally {
       clearAuthRelatedStorage()
       navigate('/login', { replace: true, state: { idleTimeout: true } })
@@ -62,8 +52,8 @@ export default function IdleTimeoutWatcher() {
     }
   }, [logout, clearAuthRelatedStorage, navigate])
 
-  // Pasang listener aktivitas & interval pengecekan idle, hanya saat user
-  // sedang login.
+  
+  
   useEffect(() => {
     if (!user) {
       if (intervalRef.current) {
@@ -98,12 +88,12 @@ export default function IdleTimeoutWatcher() {
     }
   }, [user, recordActivity, handleIdleLogout])
 
-  // Perpindahan halaman di dalam aplikasi juga dihitung sebagai aktivitas.
+  
   useEffect(() => {
     if (user) {
       recordActivity()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [location.pathname])
 
   return null

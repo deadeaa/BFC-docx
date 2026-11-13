@@ -27,7 +27,7 @@ export default function LogAktivitasPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
 
-  // Filter — hanya dikirim ke server saat berubah (tidak dicatat sebagai aktivitas apa pun)
+  
   const [userName, setUserName] = useState('')
   const [role, setRole] = useState('')
   const [activity, setActivity] = useState('')
@@ -60,7 +60,7 @@ export default function LogAktivitasPage() {
     }
   }, [page, userName, role, activity, dateFrom, dateTo])
 
-  // Debounce pencarian/filter teks agar tidak memanggil API di setiap keystroke
+  
   useEffect(() => {
     const t = setTimeout(fetchLogs, 350)
     return () => clearTimeout(t)

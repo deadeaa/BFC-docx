@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RequireTSStaffOrAdmin: hanya TS-staff atau admin yang boleh submit/ajukan approval.
-// SPV/MGR tidak perlu submit (mereka approver). Non-TS tidak boleh.
 func RequireTSStaffOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get(CtxRole)
@@ -29,7 +27,7 @@ func RequireTSStaffOrAdmin() gin.HandlerFunc {
 	}
 }
 
-// RequireApprover: SPV, MGR, atau admin. Dipakai untuk approve/reject.
+
 func RequireApprover() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get(CtxRole)

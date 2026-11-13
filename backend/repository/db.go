@@ -118,6 +118,34 @@ func (db *DB) DeleteUser(ctx context.Context, id int) error {
 	return err
 }
 
+
+func (db *DB) SyncUserNameToReports(ctx context.Context, userID int, fullName string) error {
+	if _, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports SET spv_name = $1, updated_at = NOW() WHERE spv_id = $2`,
+		fullName, userID); err != nil {
+		return err
+	}
+	if _, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports SET mgr_name = $1, updated_at = NOW() WHERE mgr_id = $2`,
+		fullName, userID); err != nil {
+		return err
+	}
+	if _, err := db.pool.Exec(ctx,
+		`UPDATE bk_reports SET rejected_by_name = $1, updated_at = NOW() WHERE rejected_by = $2`,
+		fullName, userID); err != nil {
+		return err
+	}
+	return nil
+}
+
+
+func (db *DB) SyncUserNameToLogs(ctx context.Context, userID int, fullName string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE activity_logs SET user_name = $1 WHERE user_id = $2`,
+		fullName, userID)
+	return err
+}
+
 func (db *DB) CreateSession(ctx context.Context, s *models.Session) error {
 	_, err := db.pool.Exec(ctx,
 		`INSERT INTO sessions (user_id, refresh_token, last_activity, expires_at)
@@ -1064,7 +1092,8 @@ func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan
 	var whereClause string
 	switch {
 	case role == "admin":
-		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr')"
+		
+		whereClause = "r.status IN ('waiting_spv', 'waiting_mgr', 'rejected')"
 	case role == "ts" && jabatan == "spv":
 		whereClause = "r.status = 'waiting_spv'"
 	case role == "ts" && jabatan == "mgr":
@@ -1072,7 +1101,7 @@ func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan
 	case role == "ts" && jabatan == "staff":
 		whereClause = "r.status = 'rejected'"
 	default:
-		// Non-TS (produksi/qa/ppic) tidak punya notifikasi approval
+		
 		return &models.NotificationResponse{PendingCount: 0, Items: []models.ApprovalNotificationItem{}}, nil
 	}
 
@@ -1106,7 +1135,12 @@ func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan
 		); err != nil {
 			return nil, err
 		}
-		pendingCount++
+		if (jabatan == "spv" && it.Status == "waiting_spv") ||
+			(jabatan == "mgr" && it.Status == "waiting_mgr") ||
+			(role == "admin" && (it.Status == "waiting_spv" || it.Status == "waiting_mgr" || it.Status == "rejected")) ||
+			(jabatan == "staff" && it.Status == "rejected") {
+			pendingCount++
+		}
 		items = append(items, it)
 	}
 

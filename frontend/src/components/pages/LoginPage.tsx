@@ -15,13 +15,13 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Notifikasi saat diarahkan kembali ke halaman ini karena Auto Logout (idle timeout)
+  
   const idleTimeoutState = (location.state as { idleTimeout?: boolean } | null)?.idleTimeout
   const [idleNotice, setIdleNotice] = useState(!!idleTimeoutState)
 
   useEffect(() => {
     if (idleTimeoutState) {
-      // Bersihkan state agar notifikasi tidak muncul lagi saat navigasi/refresh berikutnya
+      
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [])

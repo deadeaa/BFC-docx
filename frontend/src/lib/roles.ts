@@ -1,6 +1,5 @@
 import type { Role, Jabatan, BKReportStatus } from '../types'
 
-// Satu-satunya sumber label tampilan Role di seluruh aplikasi.
 export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Administrator',
   ppic: 'PPIC',

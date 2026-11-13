@@ -107,7 +107,7 @@ type BKReport struct {
 	CreatedBy      int        `json:"created_by"`
 	CreatedByName  string     `json:"created_by_name,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
-	Status         string     `json:"status"` // 'draft', 'waiting_spv', 'waiting_mgr', 'approved', 'rejected'
+	Status         string     `json:"status"` 
 	SPVID          *int       `json:"spv_id,omitempty"`
 	SPVName        string     `json:"spv_name,omitempty"`
 	SPVApprovedAt  *time.Time `json:"spv_approved_at,omitempty"`
@@ -134,7 +134,7 @@ type CreateBKReportRequest struct {
 	TglPembuatan   string  `json:"tgl_pembuatan" binding:"required"`
 	BobotTotal     float64 `json:"bobot_total" `
 	InputSisaMinor float64 `json:"input_sisa_minor" binding:"required"`
-	Status         string  `json:"status"` // 'draft' or 'waiting_spv'
+	Status         string  `json:"status"` 
 }
 
 type UpdateBKReportRequest struct {
@@ -147,16 +147,16 @@ type RejectBKReportRequest struct {
 }
 
 type ApprovalNotificationItem struct {
-	ID              int        `json:"id"`
-	KodeProduk      string     `json:"kode_produk"`
-	NamaProduk      string     `json:"nama_produk"`
-	NoBatch         string     `json:"no_batch"`
-	CreatedByName   string     `json:"created_by_name"`
-	CreatedAt       time.Time  `json:"created_at"`
-	Status          string     `json:"status"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
-	RejectNote      string     `json:"reject_note,omitempty"`
-	RejectedByName  string     `json:"rejected_by_name,omitempty"`
+	ID             int        `json:"id"`
+	KodeProduk     string     `json:"kode_produk"`
+	NamaProduk     string     `json:"nama_produk"`
+	NoBatch        string     `json:"no_batch"`
+	CreatedByName  string     `json:"created_by_name"`
+	CreatedAt      time.Time  `json:"created_at"`
+	Status         string     `json:"status"`
+	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
+	RejectNote     string     `json:"reject_note,omitempty"`
+	RejectedByName string     `json:"rejected_by_name,omitempty"`
 }
 
 type NotificationResponse struct {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -101,6 +102,9 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
+	
+	oldUser, _ := h.db.GetUserByID(c, id)
+
 	fields := map[string]interface{}{}
 	if req.Username != "" {
 		fields["username"] = req.Username
@@ -112,7 +116,11 @@ func (h *UserHandler) Update(c *gin.Context) {
 		fields["role"] = req.Role
 	}
 	if req.Jabatan != nil {
-		fields["jabatan"] = *req.Jabatan
+		if *req.Jabatan == "" {
+			fields["jabatan"] = nil
+		} else {
+			fields["jabatan"] = *req.Jabatan
+		}
 	}
 	if req.IsActive != nil {
 		fields["is_active"] = *req.IsActive
@@ -130,6 +138,21 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memperbarui user"})
 		return
+	}
+
+	
+	if req.FullName != "" {
+		if err := h.db.SyncUserNameToReports(c, id, req.FullName); err != nil {
+			log.Printf("[user.Update] sync nama ke bk_reports gagal (user_id=%d): %v", id, err)
+		}
+		if err := h.db.SyncUserNameToLogs(c, id, req.FullName); err != nil {
+			log.Printf("[user.Update] sync nama ke activity_logs gagal (user_id=%d): %v", id, err)
+		}
+	}
+
+	
+	if oldUser != nil && req.Username != "" && req.Username != oldUser.Username {
+		_ = h.db.DeleteUserSessions(c, id)
 	}
 
 	changed := []string{}

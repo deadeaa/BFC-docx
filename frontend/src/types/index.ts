@@ -51,6 +51,7 @@ export interface ApprovalNotificationItem {
   status: BKReportStatus
   updated_at?: string
   reject_note?: string
+  rejected_by_name?: string
 }
 
 export interface NotificationResponse {

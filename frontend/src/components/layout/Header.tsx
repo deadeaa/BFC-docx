@@ -25,7 +25,7 @@ export default function Header() {
       setNotifications(data.items || [])
       setPendingCount(data.pending_count || 0)
     } catch {
-      // silently ignore
+      
     }
   }
 
@@ -33,10 +33,10 @@ export default function Header() {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [user])
 
-  // Close dropdown on outside click
+  
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -49,8 +49,7 @@ export default function Header() {
 
   function handleSelectNotification(item: ApprovalNotificationItem) {
     setShowDropdown(false)
-    // Format query param disamakan dengan BatchKhususPage:
-    // ?kode=...&report=<id>&no_batch=<...>
+    
     const params = new URLSearchParams()
     params.set('kode', item.kode_produk)
     params.set('report', String(item.id))
@@ -71,7 +70,6 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* Dark / Light Toggle */}
         <button
           onClick={toggleTheme}
           className="transition-colors p-1.5 rounded-lg text-white/70 hover:text-brand-green-light hover:bg-white/10"
@@ -80,7 +78,6 @@ export default function Header() {
           {isDark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
-        {/* Notification Bell */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => {
@@ -98,7 +95,6 @@ export default function Header() {
             )}
           </button>
 
-          {/* Notification Dropdown Popover */}
           {showDropdown && (
             <div
               className={`absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl shadow-2xl border overflow-hidden transition-all duration-200 z-50
@@ -191,7 +187,6 @@ export default function Header() {
           )}
         </div>
 
-        {/* User Account Info */}
         <div className="flex items-center gap-2.5">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-semibold leading-tight text-white">

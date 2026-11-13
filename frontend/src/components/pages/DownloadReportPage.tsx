@@ -89,7 +89,7 @@ export default function DownloadReportPage() {
       setBkReports(reports)
       setSelectedBK(reports.length > 0 ? reports[0] : null)
     } catch (err) {
-      console.error('❌ Load BK reports error:', err)
+      console.error('❌ Load lampro error:', err)
       setBkReports([])
       setSelectedBK(null)
     } finally {
@@ -161,7 +161,7 @@ export default function DownloadReportPage() {
     }
 
     if (!selectedBK) {
-      setError('Pilih report BK')
+      setError('Pilih lampro (batch BK) terlebih dahulu')
       return
     }
 
@@ -191,14 +191,14 @@ export default function DownloadReportPage() {
       link.remove()
       window.URL.revokeObjectURL(url)
 
-      setSuccess(`Report BK berhasil didownload!`)
+      setSuccess(`Lampro berhasil didownload!`)
       setTimeout(() => setSuccess(''), 3000)
     } catch (err: any) {
       console.error('❌ Download error:', err)
       if (err.response?.status === 404) {
-        setError(`⚠️ ${err.response?.data?.message || 'Template atau report tidak ditemukan'}`)
+        setError(`⚠️ ${err.response?.data?.message || 'Template atau lampro tidak ditemukan'}`)
       } else {
-        setError(err.response?.data?.message || 'Gagal mendownload report')
+        setError(err.response?.data?.message || 'Gagal mendownload lampro')
       }
     } finally {
       setDownloading(false)
@@ -242,7 +242,7 @@ export default function DownloadReportPage() {
             Akses Ditolak
           </h1>
           <p className={cn('text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>
-            Halaman <b>Download Report</b> hanya dapat diakses oleh <b>Administrator</b> dan <b>Technical Support</b>.
+            Halaman <b>Download Lampro</b> hanya dapat diakses oleh <b>Administrator</b> dan <b>Technical Support</b>.
           </p>
         </div>
       </div>
@@ -258,10 +258,10 @@ export default function DownloadReportPage() {
           </div>
           <div>
             <h1 className={cn('text-xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>
-              Download Report Batch Khusus
+              Download Lampiran Perubahan Proses (Lampro)
             </h1>
             <p className={cn('text-sm mt-0.5', isDark ? 'text-gray-400' : 'text-gray-500')}>
-              Pilih jenis produk, produk, dan batch, lalu download report BK
+              Pilih jenis produk, produk, dan batch, lalu download lampro 
             </p>
           </div>
         </div>
@@ -414,14 +414,14 @@ export default function DownloadReportPage() {
           ) : (
             <>
               <FileDown size={18} />
-              Download Report BK
+              Download Lampro
             </>
           )}
         </button>
 
         {selectedKode && !selectedBK && !loadingBK && (
           <p className="text-sm text-center text-gray-400 mt-3">
-            Pilih batch BK untuk download report
+            Pilih batch BK untuk download lampro
           </p>
         )}
       </div>

@@ -43,8 +43,6 @@ interface ProductOption {
   nama_produk: string
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v == null || isNaN(v)) return '-'
   const formatted = v.toFixed(decimals)
@@ -66,10 +64,14 @@ function canEditReport(user: User | null, status: BKReportStatus | undefined): b
   const isSPV = isTS && user.jabatan === 'spv'
   const isMGR = isTS && user.jabatan === 'mgr'
   const isStaff = isTS && user.jabatan === 'staff'
+  const isProduksi = user.role === 'produksi'
+  const isViewOnly = user.role === 'qa' || user.role === 'ppic'
 
   if (isMGR) return false
+  if (isViewOnly) return false
   if (status === 'waiting_mgr' || status === 'approved') return false
   if (isAdmin) return true
+  if (isProduksi) return status === 'draft' || status === 'rejected'
   if (status === 'draft' || status === 'rejected') return isStaff || isSPV
   if (status === 'waiting_spv') return isSPV
   return false
@@ -102,7 +104,7 @@ function canRejectReport(user: User | null, status: BKReportStatus | undefined):
   )
 }
 
-// ── Konversi gambar stempel ke base64 (untuk PDF) ─────────────────────────
+
 async function imageToDataUrl(src: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -124,7 +126,7 @@ async function imageToDataUrl(src: string): Promise<string> {
   })
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
+
 
 export default function BatchKhususPage() {
   const { theme } = useTheme()
@@ -164,7 +166,7 @@ export default function BatchKhususPage() {
 
   const userIsAdmin = user?.role === 'admin' || user?.role === 'ts'
 
-  // ── Load product list sekali
+  
   useEffect(() => {
     api.get<ProductOption[]>('/batch-khusus/products')
       .then(res => setProductList(res.data))
@@ -201,7 +203,7 @@ export default function BatchKhususPage() {
     setHistoryData([])
   }
 
-  // ── Buat perhitungan baru: reset form tapi tetap di kode produk yang sama
+  
   const handleCreateNew = () => {
     setSavedReport(null)
     setApprovalInfo(null)
@@ -258,7 +260,7 @@ export default function BatchKhususPage() {
           setDataChanged(false)
         }
       } catch {
-        // belum ada laporan
+        
       }
 
       await loadHistory(kode)
@@ -269,7 +271,7 @@ export default function BatchKhususPage() {
     }
   }, [loadHistory])
 
-  // ── Auto-load dari query param (?kode=...&report=...&no_batch=...)
+  
   useEffect(() => {
     const kode = searchParams.get('kode')
     const reportId = searchParams.get('report')
@@ -312,10 +314,10 @@ export default function BatchKhususPage() {
           .catch(() => {})
       }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [searchParams])
 
-  // ── Perhitungan
+  
   const d5 = parseFloat(inputRaw) || 0
 
   function computeMaterialValues(): number[] {
@@ -355,7 +357,7 @@ export default function BatchKhususPage() {
     if (selectedKode && showHistory) loadHistory(selectedKode)
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
-  // ── Simpan
+  
   async function handleSave() {
     if (!product) {
       setSaveError('Pilih produk terlebih dahulu.')
@@ -407,7 +409,7 @@ export default function BatchKhususPage() {
     }
   }
 
-  // ── Submit approval
+  
   async function handleSubmitApproval() {
     if (!savedReport) {
       setActionError('Simpan laporan terlebih dahulu')
@@ -433,7 +435,7 @@ export default function BatchKhususPage() {
     }
   }
 
-  // ── Approve
+  
   async function handleApprove() {
     if (!savedReport) return
     setSubmitting(true)
@@ -459,7 +461,7 @@ export default function BatchKhususPage() {
     }
   }
 
-  // ── Reject
+  
   async function handleReject() {
     if (!savedReport || !rejectNote.trim()) {
       setActionError('Catatan penolakan wajib diisi')
@@ -488,7 +490,7 @@ export default function BatchKhususPage() {
     }
   }
 
-  // ── Export
+  
   const isExportable =
     !!product &&
     d5 > 0 &&
@@ -511,14 +513,13 @@ export default function BatchKhususPage() {
     const dateStr = formatDateForFilename(tglPembuatan)
     const filename = `Calculation_Batch_Khusus_${dateStr}`
 
-    // Encode gambar stempel ke base64 untuk PDF
     let approvedB64 = ''
     let rejectedB64 = ''
     try {
       approvedB64 = await imageToDataUrl(stampApproved)
       rejectedB64 = await imageToDataUrl(stampRejected)
     } catch {
-      // lanjut tanpa gambar kalau gagal
+      
     }
 
     const matHeaders = product.materials
@@ -577,7 +578,6 @@ export default function BatchKhususPage() {
     const tglFmt = new Date(tglPembuatan + 'T00:00:00')
       .toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
 
-    // Build stempel section
     const stampParts: string[] = []
 
     if (approvalInfo?.spv_name && approvedB64) {
@@ -605,9 +605,6 @@ export default function BatchKhususPage() {
     }
 
     if (approvalInfo?.status === 'rejected' && rejectedB64) {
-      // Tentukan siapa yang reject: SPV atau MGR?
-      // spv_name ada → reject di tahap MGR (SPV sudah approve)
-      // spv_name kosong → reject di tahap SPV
       const rejectorRole = approvalInfo.spv_name ? 'Manager (MGR)' : 'Supervisor (SPV)'
       stampParts.push(`
         <div style="display:inline-block; text-align:center; margin-right:32px; vertical-align:top;">
@@ -697,7 +694,7 @@ ${approvalStamp}
     win.onload = () => { win.print() }
   }
 
-  // ── Styling helpers
+  
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -730,12 +727,14 @@ ${approvalStamp}
   )
 
   const editable = canEditReport(user, reportStatus)
-  const canCreateNew = user?.role === 'ts' && user?.jabatan === 'staff'
+  const canCreateNew =
+    user?.role === 'admin' ||
+    (user?.role === 'ts' && user?.jabatan === 'staff') ||
+    user?.role === 'produksi'
 
-  // ── Render
+  
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1 flex-wrap">
           <div className="p-2 rounded-lg bg-brand-green/10">
@@ -756,12 +755,21 @@ ${approvalStamp}
         <p className={cn('text-sm ml-12', isDark ? 'text-gray-400' : 'text-gray-500')}>
           Pilih jenis produk, pilih kode produk, masukkan Input Sisa Minor dan No. Batch
         </p>
+
+        {(user?.role === 'qa' || user?.role === 'ppic') && (
+          <div className={cn('rounded-lg p-3 mt-3 border flex items-center gap-2',
+            isDark ? 'bg-amber-900/20 border-amber-700 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-800'
+          )}>
+            <AlertCircle size={16} className="flex-shrink-0" />
+            <span className="text-xs">
+              Role <b>{user.role.toUpperCase()}</b> hanya dapat melihat perhitungan. Tidak dapat menghitung, menyimpan, atau membuat perhitungan baru.
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Jenis & Kode Produk (satu baris) */}
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Jenis Produk */}
           <div>
             <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
               Jenis Produk
@@ -785,7 +793,6 @@ ${approvalStamp}
             </p>
           </div>
 
-          {/* Kode Produk */}
           <div>
             <label className={cn('block text-sm font-semibold mb-2', isDark ? 'text-gray-200' : 'text-gray-700')}>
               Kode Produk
@@ -868,7 +875,6 @@ ${approvalStamp}
 
       {product && !loadingProduct && (
         <>
-          {/* Tabel perhitungan */}
           <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
             <div className="grid grid-cols-2 gap-4 mb-5">
               <div>
@@ -1014,7 +1020,6 @@ ${approvalStamp}
             </div>
           </div>
 
-          {/* Stempel approval */}
           {approvalInfo && approvalInfo.status !== 'draft' && (
             <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
               <h3 className={cn('text-sm font-semibold mb-3 flex items-center gap-2',
@@ -1047,7 +1052,6 @@ ${approvalStamp}
               </div>
 
               <div className="flex flex-wrap gap-12 items-start">
-                {/* Stempel SPV */}
                 {approvalInfo.spv_name && (
                   <div className="flex flex-col items-center text-center">
                     <img
@@ -1072,7 +1076,6 @@ ${approvalStamp}
                   </div>
                 )}
 
-                {/* Stempel MGR */}
                 {approvalInfo.mgr_name && (
                   <div className="flex flex-col items-center text-center">
                     <img
@@ -1097,7 +1100,6 @@ ${approvalStamp}
                   </div>
                 )}
 
-                {/* Stempel Reject */}
                 {approvalInfo.status === 'rejected' && (
                   <div className="flex flex-col items-center text-center">
                     <img
@@ -1130,7 +1132,6 @@ ${approvalStamp}
             </div>
           )}
 
-          {/* Simpan & export */}
           <div className={cn('rounded-xl p-5 shadow-sm', card)}>
             <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
               Simpan &amp; Export
@@ -1193,7 +1194,6 @@ ${approvalStamp}
             )}
 
             <div className="flex flex-wrap gap-3">
-              {/* Simpan */}
               <button
                 onClick={handleSave}
                 disabled={saving || !d5 || !noBatch.trim() || !editable}
@@ -1216,7 +1216,6 @@ ${approvalStamp}
                 )}
               </button>
 
-              {/* Ajukan Approval */}
               {canSubmitReport(user, reportStatus) && (
                 <button
                   onClick={handleSubmitApproval}
@@ -1229,7 +1228,6 @@ ${approvalStamp}
                 </button>
               )}
 
-              {/* Approve SPV */}
               {canApproveSPV(user, reportStatus) && (
                 <button
                   onClick={handleApprove}
@@ -1241,7 +1239,6 @@ ${approvalStamp}
                 </button>
               )}
 
-              {/* Approve MGR */}
               {canApproveMGR(user, reportStatus) && (
                 <button
                   onClick={handleApprove}
@@ -1253,7 +1250,6 @@ ${approvalStamp}
                 </button>
               )}
 
-              {/* Reject */}
               {canRejectReport(user, reportStatus) && (
                 <button
                   onClick={() => setShowRejectModal(true)}
@@ -1265,7 +1261,6 @@ ${approvalStamp}
                 </button>
               )}
 
-              {/* Export PDF */}
               <button
                 onClick={handleExportPDF}
                 disabled={!isExportable}
@@ -1302,7 +1297,6 @@ ${approvalStamp}
         </>
       )}
 
-      {/* History modal */}
       {showHistory && (
         <HistoryModalBK
           isOpen={showHistory}
@@ -1326,7 +1320,6 @@ ${approvalStamp}
         />
       )}
 
-      {/* Reject modal */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className={cn('w-full max-w-md rounded-2xl shadow-2xl border p-6',

@@ -135,7 +135,6 @@ export default function HistoryModalBK({
           </div>
         </div>
 
-        {/* Filter Bar */}
         <div className={cn(
           'px-4 py-3 border-b flex items-center gap-4 flex-wrap text-sm',
           isDark ? 'border-gray-700 bg-gray-900/30' : 'border-gray-200 bg-gray-50/50'
@@ -267,7 +266,6 @@ export default function HistoryModalBK({
                         </div>
                       </div>
 
-                      {/* Detail Approval Info */}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] pt-1.5 border-t border-gray-100 dark:border-gray-700/50">
                         {report.spv_name && (
                           <span className={report.spv_approved_at ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-400'}>

@@ -136,9 +136,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logout berhasil"})
 }
 
-// Endpoint publik (tidak memerlukan JWT) untuk Sign Up mandiri. Role yang
-// boleh dipilih HANYA "produksi", "qa", atau "ppic" — role "admin" dan "ts"
-// tidak boleh dibuat melalui endpoint ini.
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req struct {
 		FullName        string      `json:"full_name" binding:"required"`
@@ -157,7 +154,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Hanya role Produksi, QA, & PPIC yang boleh dibuat melalui Sign Up.
+	
 	if !req.Role.IsSignupAllowed() {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Role tidak valid untuk pendaftaran mandiri"})
 		return
@@ -181,7 +178,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Catat ke Log Aktivitas sebagai "Registrasi user baru"
+	
 	c.Set(middleware.CtxUserID, user.ID)
 	c.Set(middleware.CtxUsername, user.Username)
 	c.Set(middleware.CtxRole, string(user.Role))

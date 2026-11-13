@@ -36,7 +36,7 @@ function todayFilename(): string {
 }
 
 
-// ─── Stempel DENGAN kotak (icon + nama + tanggal) ──────────────────────────
+
 function StampApprove({ name, date }: { name: string; date?: string | null }) {
   return (
     <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md border-2 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 text-green-700 dark:text-green-300 text-[11px] font-semibold">
@@ -79,7 +79,7 @@ export default function ReportBatchKhususPage() {
   const isDark = theme === 'dark'
   const { user } = useAuth()
   const navigate = useNavigate()
-  // Hapus: HANYA admin murni
+  
   const canDelete = user?.role === 'admin'
 
   const [reports, setReports] = useState<BKReport[]>([])
@@ -132,7 +132,7 @@ export default function ReportBatchKhususPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  // Klik baris → navigate ke halaman perhitungan, auto-load report
+  
   function openReport(r: BKReport) {
     const params = new URLSearchParams()
     params.set('kode', r.kode_produk)
@@ -228,13 +228,13 @@ export default function ReportBatchKhususPage() {
    function renderVerification(r: BKReport) {
     const items: React.ReactNode[] = []
 
-    // SPV
+    
     if (r.spv_name) {
       items.push(
         <StampApprove key="spv" name={`SPV: ${r.spv_name}`} date={r.spv_approved_at} />
       )
     } else if (r.status === 'rejected' && r.rejected_by_name && !r.mgr_name) {
-      // Reject terjadi di tahap SPV (belum ada MGR)
+      
       items.push(
         <StampReject key="spv-reject" name={`SPV: ${r.rejected_by_name}`} date={r.rejected_at} />
       )
@@ -252,13 +252,13 @@ export default function ReportBatchKhususPage() {
       )
     }
 
-    // MGR
+    
     if (r.mgr_name) {
       items.push(
         <StampApprove key="mgr" name={`MGR: ${r.mgr_name}`} date={r.mgr_approved_at} />
       )
     } else if (r.status === 'rejected' && r.rejected_by_name && r.spv_name) {
-      // Reject terjadi di tahap MGR (SPV sudah approve)
+      
       items.push(
         <StampReject key="mgr-reject" name={`MGR: ${r.rejected_by_name}`} date={r.rejected_at} />
       )
@@ -269,7 +269,7 @@ export default function ReportBatchKhususPage() {
         </span>
       )
     } else if (r.status === 'rejected' && !r.spv_name) {
-      // ditolak di SPV, MGR tidak diproses
+      
       items.push(
         <span key="mgr-na" className="inline-flex items-center px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-400 text-[11px]">
           — MGR
@@ -524,7 +524,6 @@ export default function ReportBatchKhususPage() {
         )}
       </div>
 
-      {/* Reject Note Modal */}
       {activeNote && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={cn('w-full max-w-md rounded-2xl p-6 shadow-2xl border', card)}>

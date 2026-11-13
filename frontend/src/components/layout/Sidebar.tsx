@@ -66,7 +66,6 @@ export default function Sidebar() {
   const canCalc = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
   const canReport = hasRole('admin', 'produksi', 'qa', 'ts', 'ppic')
 
-  // Admin (kelola produk BK/BO): admin murni + TS staff
   const isPureAdmin = user?.role === 'admin'
   const isTSStaff = user?.role === 'ts' && user?.jabatan === 'staff'
   const canAccessAdminProducts = isPureAdmin || isTSStaff
@@ -188,7 +187,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Menu Admin (kelola produk BK/BO): admin murni + TS staff */}
         {canAccessAdminProducts && (
           <div>
             {collapsed ? (
@@ -221,13 +219,12 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Template Report — HANYA admin murni */}
         {isPureAdmin && (
           <div className="pt-2">
             {collapsed ? (
               <TooltipLink item={{ name: 'Template Report', path: '/admin/report-templates' }} icon={<FileText size={20} />} />
             ) : (
-              <NavItem path="/admin/report-templates" icon={<FileText size={20} />} label="Template Report" collapsed={collapsed} />
+              <NavItem path="/admin/report-templates" icon={<FileText size={20} />} label="Template Lampro" collapsed={collapsed} />
             )}
           </div>
         )}
@@ -237,12 +234,11 @@ export default function Sidebar() {
             {collapsed ? (
               <TooltipLink item={{ name: 'Download Report', path: '/download-report' }} icon={<FileDown size={20} />} />
             ) : (
-              <NavItem path="/download-report" icon={<FileDown size={20} />} label="Download Report" collapsed={collapsed} />
+              <NavItem path="/download-report" icon={<FileDown size={20} />} label="Download Lampro" collapsed={collapsed} />
             )}
           </div>
         )}
 
-        {/* Manajemen — HANYA admin murni */}
         {isPureAdmin && (
           <div className="pt-2 space-y-1">
             {!collapsed && (

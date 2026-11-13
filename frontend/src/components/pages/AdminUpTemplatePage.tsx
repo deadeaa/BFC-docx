@@ -137,10 +137,10 @@ export default function AdminReportTemplatePage() {
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
       <div className="mb-6">
         <h1 className={cn('text-xl font-bold', isDark ? 'text-white' : 'text-gray-900')}>
-          Admin - Template Report
+          Admin - Template Lampro
         </h1>
         <p className={cn('text-sm mt-0.5', isDark ? 'text-gray-400' : 'text-gray-500')}>
-          Upload/Update template DOCX untuk laporan per produk
+          Upload/Update template lampro dengan format DOCX untuk laporan per produk
         </p>
       </div>
 
