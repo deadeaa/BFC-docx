@@ -371,3 +371,16 @@ func (db *DB) DeleteBOProductWithConfig(ctx context.Context, id int) error {
 
 	return tx.Commit(ctx)
 }
+
+func (db *DB) IsNoBatchLocked(ctx context.Context, kodeProduk, noBatch string) (bool, error) {
+	var exists bool
+	err := db.pool.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM bk_reports
+			WHERE LOWER(kode_produk) = LOWER($1)
+			  AND LOWER(no_batch) = LOWER($2)
+			  AND status = 'approved'
+		)`,
+		kodeProduk, noBatch).Scan(&exists)
+	return exists, err
+}

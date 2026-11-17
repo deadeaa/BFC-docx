@@ -39,6 +39,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	if user.ApprovalStatus == "pending" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Akun Anda masih menunggu approval Administrator. Silakan hubungi admin."})
+		return
+	}
+	if user.ApprovalStatus == "rejected" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Akun Anda ditolak oleh Administrator. Hubungi admin untuk info lebih lanjut."})
+		return
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Username atau password salah"})
 		return
@@ -140,9 +149,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var req struct {
 		FullName        string      `json:"full_name" binding:"required"`
 		Username        string      `json:"username" binding:"required"`
-		Password        string      `json:"password" binding:"required,min=6"`
+		Password        string      `json:"password" binding:"required"`
 		ConfirmPassword string      `json:"confirm_password" binding:"required"`
 		Role            models.Role `json:"role" binding:"required"`
+		Jabatan         string      `json:"jabatan"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak lengkap atau tidak valid"})
@@ -154,10 +164,23 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	
-	if !req.Role.IsSignupAllowed() {
+	if ok, msg := auth.ValidatePassword(req.Password); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	if !req.Role.IsSignupAllowed() && req.Role != models.RoleTS {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Role tidak valid untuk pendaftaran mandiri"})
 		return
+	}
+
+	if req.Role == models.RoleTS {
+		if req.Jabatan != "staff" && req.Jabatan != "spv" && req.Jabatan != "mgr" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Jabatan Technical Services wajib dipilih (Staff/SPV/MGR)"})
+			return
+		}
+	} else {
+		req.Jabatan = ""
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -167,28 +190,82 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user, err := h.db.CreateUser(c, &models.User{
-		Username: req.Username,
-		FullName: req.FullName,
-		Password: string(hashed),
-		Role:     req.Role,
-		IsActive: true,
+		Username:       req.Username,
+		FullName:       req.FullName,
+		Password:       string(hashed),
+		Role:           req.Role,
+		Jabatan:        req.Jabatan,
+		IsActive:       true,
+		ApprovalStatus: "pending",
 	})
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"message": "Username sudah digunakan"})
 		return
 	}
 
-	
 	c.Set(middleware.CtxUserID, user.ID)
 	c.Set(middleware.CtxUsername, user.Username)
 	c.Set(middleware.CtxRole, string(user.Role))
 	audit.Log(c, h.db, audit.Entry{
 		Menu:        "User Management",
 		Activity:    "Registrasi User Baru",
-		Description: "User baru '" + user.Username + "' mendaftar mandiri dengan role " + string(user.Role),
+		Description: "User baru '" + user.Username + "' mendaftar dengan role " + string(user.Role) + " — menunggu approval admin",
 	})
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Registrasi berhasil, silakan login"})
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Registrasi berhasil. Akun menunggu approval Administrator sebelum bisa login.",
+	})
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req struct {
+		Username        string `json:"username" binding:"required"`
+		NewPassword     string `json:"new_password" binding:"required"`
+		ConfirmPassword string `json:"confirm_password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak lengkap"})
+		return
+	}
+	if req.NewPassword != req.ConfirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Konfirmasi password tidak sama"})
+		return
+	}
+	if ok, msg := auth.ValidatePassword(req.NewPassword); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	user, err := h.db.GetUserByUsername(c, req.Username)
+	if err != nil || !user.IsActive {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Username tidak ditemukan atau tidak aktif"})
+		return
+	}
+	if user.ApprovalStatus != "approved" {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Akun belum/tidak disetujui Administrator"})
+		return
+	}
+
+	
+	if exists, _ := h.db.HasPendingPasswordReset(c, user.ID); exists {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Sudah ada permintaan ganti password yang menunggu approval admin"})
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memproses password"})
+		return
+	}
+
+	if err := h.db.CreatePasswordResetRequest(c, user.ID, string(hashed)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyimpan permintaan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Permintaan ganti password dikirim. Password baru aktif setelah di-approve Administrator.",
+	})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {

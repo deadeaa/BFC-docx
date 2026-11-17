@@ -31,9 +31,9 @@ func New(connStr string) (*DB, error) {
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, created_at, updated_at
+		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, approval_status, created_at, updated_at
 		 FROM users WHERE username = $1`, username).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.ApprovalStatus, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -43,9 +43,9 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, created_at, updated_at
+		`SELECT id, username, full_name, password, role, COALESCE(jabatan, ''), is_active, approval_status, created_at, updated_at
 		 FROM users WHERE id = $1`, id).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Password, &u.Role, &u.Jabatan, &u.IsActive, &u.ApprovalStatus, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,8 @@ func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 
 func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := db.pool.Query(ctx,
-		`SELECT id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at FROM users ORDER BY id`)
+		`SELECT id, username, full_name, role, COALESCE(jabatan, ''), is_active, approval_status, created_at, updated_at
+		 FROM users ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.ApprovalStatus, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -72,13 +73,16 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 }
 
 func (db *DB) CreateUser(ctx context.Context, u *models.User) (*models.User, error) {
+	if u.ApprovalStatus == "" {
+		u.ApprovalStatus = "approved"
+	}
 	created := &models.User{}
 	err := db.pool.QueryRow(ctx,
-		`INSERT INTO users (username, full_name, password, role, jabatan, is_active)
-		 VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6)
-		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at`,
-		u.Username, u.FullName, u.Password, u.Role, u.Jabatan, u.IsActive).
-		Scan(&created.ID, &created.Username, &created.FullName, &created.Role, &created.Jabatan, &created.IsActive, &created.CreatedAt, &created.UpdatedAt)
+		`INSERT INTO users (username, full_name, password, role, jabatan, is_active, approval_status)
+		 VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7)
+		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, approval_status, created_at, updated_at`,
+		u.Username, u.FullName, u.Password, u.Role, u.Jabatan, u.IsActive, u.ApprovalStatus).
+		Scan(&created.ID, &created.Username, &created.FullName, &created.Role, &created.Jabatan, &created.IsActive, &created.ApprovalStatus, &created.CreatedAt, &created.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -101,12 +105,12 @@ func (db *DB) UpdateUser(ctx context.Context, id int, fields map[string]interfac
 
 	query := fmt.Sprintf(
 		`UPDATE users SET %s WHERE id = $%d
-		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, created_at, updated_at`,
+		 RETURNING id, username, full_name, role, COALESCE(jabatan, ''), is_active, approval_status, created_at, updated_at`,
 		strings.Join(setClauses, ", "), i)
 
 	u := &models.User{}
 	err := db.pool.QueryRow(ctx, query, args...).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Role, &u.Jabatan, &u.IsActive, &u.ApprovalStatus, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +122,117 @@ func (db *DB) DeleteUser(ctx context.Context, id int) error {
 	return err
 }
 
+func (db *DB) HasPendingPasswordReset(ctx context.Context, userID int) (bool, error) {
+	var exists bool
+	err := db.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM password_reset_requests WHERE user_id = $1 AND status = 'pending')`,
+		userID).Scan(&exists)
+	return exists, err
+}
+
+func (db *DB) CreatePasswordResetRequest(ctx context.Context, userID int, hashedPassword string) error {
+	_, err := db.pool.Exec(ctx,
+		`INSERT INTO password_reset_requests (user_id, new_password, status) VALUES ($1, $2, 'pending')`,
+		userID, hashedPassword)
+	return err
+}
+
+type PasswordResetRequest struct {
+	ID             int        `json:"id"`
+	UserID         int        `json:"user_id"`
+	Username       string     `json:"username"`
+	FullName       string     `json:"full_name"`
+	NewPassword    string     `json:"-"`
+	Status         string     `json:"status"`
+	RequestedAt    time.Time  `json:"requested_at"`
+	ReviewedBy     *int       `json:"reviewed_by,omitempty"`
+	ReviewedByName string     `json:"reviewed_by_name,omitempty"`
+	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
+	RejectNote     string     `json:"reject_note,omitempty"`
+}
+
+func (db *DB) ListPendingPasswordResets(ctx context.Context) ([]PasswordResetRequest, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT pr.id, pr.user_id, u.username, u.full_name, pr.new_password,
+		        pr.status, pr.requested_at,
+		        pr.reviewed_by, COALESCE(pr.reviewed_by_name, ''), pr.reviewed_at, COALESCE(pr.reject_note, '')
+		 FROM password_reset_requests pr
+		 JOIN users u ON u.id = pr.user_id
+		 WHERE pr.status = 'pending'
+		 ORDER BY pr.requested_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []PasswordResetRequest
+	for rows.Next() {
+		var r PasswordResetRequest
+		if err := rows.Scan(&r.ID, &r.UserID, &r.Username, &r.FullName, &r.NewPassword,
+			&r.Status, &r.RequestedAt, &r.ReviewedBy, &r.ReviewedByName, &r.ReviewedAt, &r.RejectNote); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func (db *DB) ApprovePasswordReset(ctx context.Context, requestID int, adminID int, adminName string) error {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var userID int
+	var newPassword string
+	var status string
+	err = tx.QueryRow(ctx,
+		`SELECT user_id, new_password, status FROM password_reset_requests WHERE id = $1 FOR UPDATE`,
+		requestID).Scan(&userID, &newPassword, &status)
+	if err != nil {
+		return err
+	}
+	if status != "pending" {
+		return fmt.Errorf("request sudah diproses")
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2`,
+		newPassword, userID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE password_reset_requests
+		 SET status = 'approved', reviewed_by = $1, reviewed_by_name = $2, reviewed_at = NOW()
+		 WHERE id = $3`,
+		adminID, adminName, requestID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (db *DB) RejectPasswordReset(ctx context.Context, requestID int, adminID int, adminName, note string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE password_reset_requests
+		 SET status = 'rejected', reviewed_by = $1, reviewed_by_name = $2, reviewed_at = NOW(), reject_note = $3
+		 WHERE id = $4 AND status = 'pending'`,
+		adminID, adminName, note, requestID)
+	return err
+}
+
+func (db *DB) SetUserApprovalStatus(ctx context.Context, id int, status string) error {
+	_, err := db.pool.Exec(ctx,
+		`UPDATE users SET approval_status = $1, updated_at = NOW() WHERE id = $2`,
+		status, id)
+	return err
+}
 
 func (db *DB) SyncUserNameToReports(ctx context.Context, userID int, fullName string) error {
 	if _, err := db.pool.Exec(ctx,
@@ -323,7 +438,22 @@ CREATE TABLE IF NOT EXISTS users (
 	updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id              SERIAL PRIMARY KEY,
+    user_id         INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    new_password    VARCHAR(255) NOT NULL,  -- sudah di-hash
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending / approved / rejected
+    requested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_by     INT REFERENCES users(id),
+    reviewed_by_name VARCHAR(200),
+    reviewed_at     TIMESTAMPTZ,
+    reject_note     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pw_reset_status ON password_reset_requests(status);
+CREATE INDEX IF NOT EXISTS idx_pw_reset_user ON password_reset_requests(user_id);
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS jabatan VARCHAR(20) DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'approved';
 
 CREATE TABLE IF NOT EXISTS sessions (
 	id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1088,7 +1218,7 @@ func (db *DB) RejectBKReport(ctx context.Context, id int, rejectedBy int, reject
 	return err
 }
 
-func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan string) (*models.NotificationResponse, error) {
+func (db *DB) GetPendingApprovalNotifications(ctx context.Context, role, jabatan, username string, userID int) (*models.NotificationResponse, error) {
 	var whereClause string
 	switch {
 	case role == "admin":

@@ -73,6 +73,7 @@ func main() {
 		authGroup.POST("/register", authHandler.Register)
 		authGroup.POST("/refresh-token", authHandler.RefreshToken)
 		authGroup.POST("/logout", middleware.Auth(jwtSvc), authHandler.Logout)
+		authGroup.POST("/forgot-password", authHandler.ForgotPassword)
 		authGroup.GET("/me", middleware.Auth(jwtSvc), authHandler.Me)
 	}
 
@@ -110,6 +111,13 @@ func main() {
 
 		adminGroup := protected.Group("", middleware.AdminOrTSOnly())
 		{
+			adminGroup.GET("/users/password-resets", userHandler.ListPasswordResets)
+			adminGroup.POST("/users/password-resets/:id/approve", userHandler.ApprovePasswordReset)
+			adminGroup.POST("/users/password-resets/:id/reject", userHandler.RejectPasswordReset)
+
+			adminGroup.POST("/users/:id/approve", userHandler.Approve)
+			adminGroup.POST("/users/:id/reject", userHandler.Reject)
+
 			adminGroup.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
 			adminGroup.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
 			adminGroup.POST("/reports/download", reportDownloadHandler.DownloadReportByType)

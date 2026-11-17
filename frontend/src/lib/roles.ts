@@ -33,6 +33,12 @@ export function fullRoleLabel(role?: Role | string | null, jabatan?: Jabatan | s
   return rLabel
 }
 
+export function approvalLabel(status?: string | null): string {
+  if (status === 'pending') return 'Menunggu Approval'
+  if (status === 'rejected') return 'Ditolak'
+  return 'Aktif'
+}
+
 export const STATUS_LABELS: Record<BKReportStatus, string> = {
   draft: 'Draft',
   waiting_spv: 'Menunggu SPV',

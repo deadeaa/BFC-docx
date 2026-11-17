@@ -10,6 +10,7 @@ import (
 	"bfc-backend/middleware"
 	"bfc-backend/models"
 	"bfc-backend/repository"
+	"bfc-backend/auth"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -39,7 +40,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	var req struct {
 		Username string      `json:"username" binding:"required"`
 		FullName string      `json:"full_name" binding:"required"`
-		Password string      `json:"password" binding:"required,min=6"`
+		Password string      `json:"password" binding:"required"`
 		Role     models.Role `json:"role" binding:"required"`
 		Jabatan  string      `json:"jabatan"`
 		IsActive *bool       `json:"is_active"`
@@ -47,6 +48,20 @@ func (h *UserHandler) Create(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data tidak lengkap atau tidak valid"})
 		return
+	}
+
+	if ok, msg := auth.ValidatePassword(req.Password); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		return
+	}
+
+	if req.Role == models.RoleTS {
+		if req.Jabatan != "staff" && req.Jabatan != "spv" && req.Jabatan != "mgr" {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Jabatan Technical Services wajib dipilih"})
+			return
+		}
+	} else {
+		req.Jabatan = ""
 	}
 
 	isActive := true
@@ -61,12 +76,13 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	user, err := h.db.CreateUser(c, &models.User{
-		Username: req.Username,
-		FullName: req.FullName,
-		Password: string(hashed),
-		Role:     req.Role,
-		Jabatan:  req.Jabatan,
-		IsActive: isActive,
+		Username:       req.Username,
+		FullName:       req.FullName,
+		Password:       string(hashed),
+		Role:           req.Role,
+		Jabatan:        req.Jabatan,
+		IsActive:       isActive,
+		ApprovalStatus: "approved", 
 	})
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"message": "Username sudah digunakan"})
@@ -80,6 +96,62 @@ func (h *UserHandler) Create(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusCreated, user)
+}
+
+func (h *UserHandler) Approve(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "User tidak ditemukan"})
+		return
+	}
+
+	if err := h.db.SetUserApprovalStatus(c, id, "approved"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal approve user"})
+		return
+	}
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "User Management",
+		Activity:    "Approve User Baru",
+		Description: "Menyetujui user '" + user.Username + "' (role " + string(user.Role) + ")",
+	})
+
+	updated, _ := h.db.GetUserByID(c, id)
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *UserHandler) Reject(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "ID tidak valid"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(c, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "User tidak ditemukan"})
+		return
+	}
+
+	if err := h.db.SetUserApprovalStatus(c, id, "rejected"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal reject user"})
+		return
+	}
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "User Management",
+		Activity:    "Reject User Baru",
+		Description: "Menolak user '" + user.Username + "' (role " + string(user.Role) + ")",
+	})
+
+	updated, _ := h.db.GetUserByID(c, id)
+	c.JSON(http.StatusOK, updated)
 }
 
 func (h *UserHandler) Update(c *gin.Context) {
@@ -125,7 +197,12 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if req.IsActive != nil {
 		fields["is_active"] = *req.IsActive
 	}
+
 	if req.Password != "" {
+		if ok, msg := auth.ValidatePassword(req.Password); !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"message": msg})
+			return
+		}
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memproses password"})
@@ -133,6 +210,8 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 		fields["password"] = string(hashed)
 	}
+
+	
 
 	user, err := h.db.UpdateUser(c, id, fields)
 	if err != nil {
@@ -216,4 +295,61 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "User berhasil dihapus"})
+}
+
+func (h *UserHandler) ListPasswordResets(c *gin.Context) {
+	list, err := h.db.ListPendingPasswordResets(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal memuat permintaan"})
+		return
+	}
+	if list == nil {
+		list = []repository.PasswordResetRequest{}
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func (h *UserHandler) ApprovePasswordReset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
+	user, _ := h.db.GetUserByID(c, uid)
+
+	if err := h.db.ApprovePasswordReset(c, id, uid, user.FullName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Gagal approve: " + err.Error()})
+		return
+	}
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "User Management",
+		Activity:    "Approve Ganti Password",
+		Description: "Menyetujui permintaan ganti password #" + strconv.Itoa(id),
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password user berhasil diubah"})
+}
+
+func (h *UserHandler) RejectPasswordReset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var req struct {
+		RejectNote string `json:"reject_note"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	userID, _ := c.Get(middleware.CtxUserID)
+	uid, _ := userID.(int)
+	user, _ := h.db.GetUserByID(c, uid)
+
+	if err := h.db.RejectPasswordReset(c, id, uid, user.FullName, req.RejectNote); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Gagal reject"})
+		return
+	}
+
+	audit.Log(c, h.db, audit.Entry{
+		Menu:        "User Management",
+		Activity:    "Reject Ganti Password",
+		Description: "Menolak permintaan ganti password #" + strconv.Itoa(id),
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Permintaan ditolak"})
 }

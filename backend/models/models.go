@@ -24,15 +24,16 @@ func (r Role) IsSignupAllowed() bool {
 }
 
 type User struct {
-	ID        int       `json:"id"`
-	Username  string    `json:"username"`
-	FullName  string    `json:"full_name"`
-	Password  string    `json:"-"`
-	Role      Role      `json:"role"`
-	Jabatan   string    `json:"jabatan"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	Username       string    `json:"username"`
+	FullName       string    `json:"full_name"`
+	Password       string    `json:"-"`
+	Role           Role      `json:"role"`
+	Jabatan        string    `json:"jabatan"`
+	IsActive       bool      `json:"is_active"`
+	ApprovalStatus string    `json:"approval_status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Session struct {
