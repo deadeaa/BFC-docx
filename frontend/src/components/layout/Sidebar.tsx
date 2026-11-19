@@ -219,10 +219,10 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isPureAdmin && (
+        {canAccessAdminProducts && (
           <div className="pt-2">
             {collapsed ? (
-              <TooltipLink item={{ name: 'Template Report', path: '/admin/report-templates' }} icon={<FileText size={20} />} />
+              <TooltipLink item={{ name: 'Template Lampro', path: '/admin/report-templates' }} icon={<FileText size={20} />} />
             ) : (
               <NavItem path="/admin/report-templates" icon={<FileText size={20} />} label="Template Lampro" collapsed={collapsed} />
             )}
