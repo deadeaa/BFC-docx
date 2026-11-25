@@ -762,7 +762,7 @@ ${approvalStamp}
           )}>
             <AlertCircle size={16} className="flex-shrink-0" />
             <span className="text-xs">
-              Role <b>{user.role.toUpperCase()}</b> hanya dapat melihat perhitungan. Tidak dapat menghitung, menyimpan, atau membuat perhitungan baru.
+              Role <b>{user.role.toUpperCase()}</b> hanya dapat melihat perhitungan Batch Khusus. Tidak dapat menghitung, menyimpan, atau membuat perhitungan baru.
             </span>
           </div>
         )}

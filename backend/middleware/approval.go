@@ -44,3 +44,24 @@ func RequireApprover() gin.HandlerFunc {
 		})
 	}
 }
+
+func RequireAdminTSStaffOrProduksi() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get(CtxRole)
+		roleStr, _ := role.(string)
+		jabatan, _ := c.Get(CtxJabatan)
+		jabatanStr, _ := jabatan.(string)
+
+		if roleStr == "admin" || roleStr == "produksi" {
+			c.Next()
+			return
+		}
+		if roleStr == "ts" && jabatanStr == "staff" {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"message": "Hanya Administrator, Staff TS, atau Produksi yang dapat melakukan perhitungan Batch Overfilled",
+		})
+	}
+}

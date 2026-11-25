@@ -82,7 +82,10 @@ export default function DownloadReportPage() {
       const res = await api.get(`/batch-khusus/reports/product/${kode}`, {
         params: { limit: 100 }
       })
-      const reports = (res.data || []).map((r: any) => ({ ...r, type: 'BK' as const }))
+      
+      const reports = (res.data || [])
+        .filter((r: any) => r.status === 'approved')
+        .map((r: any) => ({ ...r, type: 'BK' as const }))
       reports.sort((a: any, b: any) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
@@ -350,7 +353,9 @@ export default function DownloadReportPage() {
               </div>
             )}
             {!loadingBK && bkReports.length === 0 && selectedKode && (
-              <p className="text-xs text-yellow-500 mt-1">⚠️ Belum ada report BK untuk produk ini</p>
+              <p className="text-xs text-yellow-500 mt-1">
+                ⚠️ Belum ada batch dengan status <b>Approved</b> untuk produk ini. Lampro hanya bisa diunduh setelah perhitungan disetujui penuh (SPV + MGR).
+              </p>
             )}
           </div>
         )}

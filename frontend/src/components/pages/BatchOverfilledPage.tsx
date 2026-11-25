@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History } from 'lucide-react'
+import { Calculator, Save, ChevronDown, AlertCircle, CheckCircle2, FileDown, History, Plus, Eye } from 'lucide-react'
 import api from '../../lib/api'
 import { useTheme } from '../../context/ThemeContext'
 import { cn } from '../../lib/utils'
@@ -41,7 +41,7 @@ interface CriteriaResult {
   label: string
   status: 'MS' | 'TMS'
   pivotValue: number
-  checks: { 
+  checks: {
     targetIndex: number
     minRatio: number
     maxRatio: number
@@ -126,7 +126,7 @@ function calculateCriteria(
       label: m.label,
       status: 'TMS' as const,
       pivotValue: 0,
-      checks: []
+      checks: [],
     }))
   }
 
@@ -136,62 +136,36 @@ function calculateCriteria(
 
   return materials.map((m, i) => {
     const isPivot = i === pivotIdx
-    const checks: { targetIndex: number, minRatio: number, maxRatio: number, actualRatio: number, passed: boolean }[] = []
+    const checks: { targetIndex: number; minRatio: number; maxRatio: number; actualRatio: number; passed: boolean }[] = []
     let allPassed = true
 
     if (isPivot) {
-      materials.forEach((targetMat, j) => {
+      materials.forEach((_targetMat, j) => {
         if (i === j) {
           const passed = Math.abs(ratioVals[i] - 1) < EPS
           if (!passed) allPassed = false
-          checks.push({
-            targetIndex: i,
-            minRatio: 1,
-            maxRatio: 1,
-            actualRatio: ratioVals[i],
-            passed
-          })
+          checks.push({ targetIndex: i, minRatio: 1, maxRatio: 1, actualRatio: ratioVals[i], passed })
         } else {
           const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
           if (th) {
             const passed = ratioVals[j] >= th.min_ratio - EPS && ratioVals[j] <= th.max_ratio + EPS
             if (!passed) allPassed = false
-            checks.push({
-              targetIndex: j,
-              minRatio: th.min_ratio,
-              maxRatio: th.max_ratio,
-              actualRatio: ratioVals[j],
-              passed
-            })
+            checks.push({ targetIndex: j, minRatio: th.min_ratio, maxRatio: th.max_ratio, actualRatio: ratioVals[j], passed })
           } else {
-            checks.push({
-              targetIndex: j,
-              minRatio: 0,
-              maxRatio: 0,
-              actualRatio: ratioVals[j],
-              passed: true
-            })
+            checks.push({ targetIndex: j, minRatio: 0, maxRatio: 0, actualRatio: ratioVals[j], passed: true })
           }
         }
       })
     } else {
-      return {
-        materialIndex: i,
-        label: m.label,
-        status: 'TMS' as const,
-        pivotValue: 0,
-        checks: []
-      }
+      return { materialIndex: i, label: m.label, status: 'TMS' as const, pivotValue: 0, checks: [] }
     }
-
-    const status = allPassed ? 'MS' : 'TMS'
 
     return {
       materialIndex: i,
       label: m.label,
-      status,
+      status: allPassed ? 'MS' : 'TMS',
       pivotValue: isPivot ? pivotValue : 0,
-      checks
+      checks,
     }
   })
 }
@@ -201,6 +175,12 @@ export default function BatchOverfilledPage() {
   const isDark = theme === 'dark'
   const { user } = useAuth()
 
+  const canCalculateBO =
+    user?.role === 'admin' ||
+    user?.role === 'produksi' ||
+    (user?.role === 'ts' && user?.jabatan === 'staff')
+  const isViewOnly = !canCalculateBO
+
   const [productList, setProductList] = useState<ProductOption[]>([])
   const [selectedKode, setSelectedKode] = useState<string>('')
   const [product, setProduct] = useState<BOProduct | null>(null)
@@ -208,7 +188,7 @@ export default function BatchOverfilledPage() {
   const [loadingLatest, setLoadingLatest] = useState(false)
 
   const [savedReport, setSavedReport] = useState<BOReport | null>(null)
-  const [dataChanged, setDataChanged] = useState(false)  
+  const [dataChanged, setDataChanged] = useState(false)
 
   const [latestReport, setLatestReport] = useState<BOReport | null>(null)
   const [showHistory, setShowHistory] = useState(false)
@@ -275,39 +255,31 @@ export default function BatchOverfilledPage() {
   const ratio = perbandingan.map(c => (c != null && nilaiTertinggi ? c / nilaiTertinggi : null))
 
   const criteriaResults = calculateCriteria(materials, ratio, thresholds, allFilled)
-  
-  const pivotIndex = allFilled && ratio.some(r => r != null) 
-    ? findPivotIndex(ratio as number[]) 
+
+  const pivotIndex = allFilled && ratio.some(r => r != null)
+    ? findPivotIndex(ratio as number[])
     : -1
-  
+
   const pivotResult = pivotIndex >= 0 ? criteriaResults[pivotIndex] : undefined
   const kesimpulan: 'MS' | 'TMS' = pivotResult?.status === 'MS' ? 'MS' : 'TMS'
-  
+
   const targetBaru = materials.map(m => (nilaiTertinggi != null ? m.target_kg * nilaiTertinggi : null))
   const tambahanReproses = targetBaru.map((f, i) => (f != null && hasilBatching[i] != null ? f - (hasilBatching[i] as number) : null))
 
   const loadHistory = useCallback(async (kode?: string) => {
     const targetKode = kode || selectedKode
     if (!targetKode) return
-    
+
     setLoadingHistory(true)
     try {
-      const params: { no_batch?: string; limit?: string } = {
-        limit: '100'
-      }
-      
+      const params: { no_batch?: string; limit?: string } = { limit: '100' }
       const currentFilter = filterNoBatch?.trim() || ''
       if (currentFilter && currentFilter !== '' && currentFilter !== 'all' && currentFilter !== 'undefined') {
         params.no_batch = currentFilter
       }
-      
-      const res = await api.get<BOReport[]>(`/batch-overfilled/reports/product/${targetKode}`, {
-        params
-      })
-      
+      const res = await api.get<BOReport[]>(`/batch-overfilled/reports/product/${targetKode}`, { params })
       setHistoryData(res.data || [])
-    } catch (err: any) {
-      console.error('❌ Gagal load history:', err.response?.data || err.message)
+    } catch {
       setHistoryData([])
     } finally {
       setLoadingHistory(false)
@@ -327,12 +299,12 @@ export default function BatchOverfilledPage() {
     setSaveError('')
     setFilterNoBatch('')
     setHistoryData([])
-    
+
     if (!kode) return
-    
+
     setLoadingProduct(true)
     setLoadingLatest(true)
-    
+
     try {
       const productRes = await api.get<BOProduct>(`/batch-overfilled/products/${kode}`)
       const safeProduct: BOProduct = {
@@ -341,38 +313,33 @@ export default function BatchOverfilledPage() {
         thresholds: productRes.data.thresholds ?? [],
       }
       setProduct(safeProduct)
-      
-      const directCount = Math.max(safeProduct.materials.length - 1, 0)
-      setInputRaws(new Array(directCount).fill(''))
-      
+
+      const dc = Math.max(safeProduct.materials.length - 1, 0)
+      setInputRaws(new Array(dc).fill(''))
+
       try {
         const reportRes = await api.get<BOReport>(`/batch-overfilled/reports/latest/${kode}`)
         if (reportRes.data && reportRes.data.detail_json) {
           const detail: ReportDetail = JSON.parse(reportRes.data.detail_json)
           setLatestReport(reportRes.data)
-          
+
           if (detail.materials) {
-            const lastInputs = detail.materials.slice(0, directCount).map((m: any) => 
-              m.hasil_batching?.toString() || ''
-            )
+            const lastInputs = detail.materials.slice(0, dc).map((m: any) => m.hasil_batching?.toString() || '')
             setInputRaws(lastInputs)
             setBobotTotalRaw(reportRes.data.bobot_total?.toString() || '')
             setNoBatch(reportRes.data.no_batch || '')
           }
-          setSavedReport(reportRes.data)  
+          setSavedReport(reportRes.data)
           setDataChanged(false)
         }
-      } catch (err) {
-        console.log('ℹ️ No latest report found for:', kode)
-        setInputRaws(new Array(directCount).fill(''))
+      } catch {
+        setInputRaws(new Array(dc).fill(''))
         setBobotTotalRaw('')
         setNoBatch('')
       }
-      
+
       await loadHistory(kode)
-      
-    } catch (err) {
-      console.error('❌ Gagal memuat data produk:', err)
+    } catch {
       setSaveError('Gagal memuat data produk. Coba pilih ulang.')
     } finally {
       setLoadingProduct(false)
@@ -381,12 +348,26 @@ export default function BatchOverfilledPage() {
   }, [loadHistory])
 
   useEffect(() => {
-    if (selectedKode && showHistory) {
-      loadHistory(selectedKode)
-    }
+    if (selectedKode && showHistory) loadHistory(selectedKode)
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
+  const handleCreateNew = () => {
+    if (!canCalculateBO) return
+    const dc = Math.max(materials.length - 1, 0)
+    setInputRaws(new Array(dc).fill(''))
+    setBobotTotalRaw('')
+    setNoBatch('')
+    setSavedReport(null)
+    setDataChanged(false)
+    setSaveSuccess(false)
+    setSaveError('')
+  }
+
   async function handleSave() {
+    if (!canCalculateBO) {
+      setSaveError('Anda tidak memiliki hak untuk menyimpan perhitungan Batch Overfilled.')
+      return
+    }
     if (!product || !tglPembuatan) {
       setSaveError('Lengkapi Tanggal Pembuatan sebelum menyimpan.')
       return
@@ -399,16 +380,15 @@ export default function BatchOverfilledPage() {
       setSaveError('Isi No. Batch terlebih dahulu.')
       return
     }
-    
     if (hasilBatching.some(h => h != null && h < 0)) {
       setSaveError('Hasil Batching komponen terakhir tidak boleh negatif. Periksa Bobot Total.')
       return
     }
-    
+
     setSaving(true)
     setSaveError('')
     setSaveSuccess(false)
-    
+
     try {
       const payload = {
         kode_produk: product.kode_produk,
@@ -434,49 +414,46 @@ export default function BatchOverfilledPage() {
             label: cr.label,
             status: cr.status,
             pivotValue: cr.pivotValue,
-            checks: cr.checks
+            checks: cr.checks,
           })),
           kesimpulan: kesimpulan,
         },
       }
 
       const response = await api.post<BOReport>('/batch-overfilled/reports', payload)
-      
+
       setLatestReport(response.data)
       setSavedReport(response.data)
-      setDataChanged(false) 
+      setDataChanged(false)
       setHistoryData(prev => [response.data, ...prev])
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 4000)
-      
     } catch (err: any) {
-      console.error('❌ Save error:', err.response?.data)
       setSaveError(err.response?.data?.message || 'Gagal menyimpan. Coba lagi.')
     } finally {
       setSaving(false)
     }
   }
 
-  const isExportable = 
-    !!product 
-    && allFilled 
-    && !!savedReport 
-    && savedReport.no_batch === noBatch.trim()
-    && !dataChanged
+  const isExportable =
+    !!product &&
+    allFilled &&
+    !!savedReport &&
+    savedReport.no_batch === noBatch.trim() &&
+    !dataChanged
 
   function handleExportPDF() {
     if (!product || !allFilled || nilaiTertinggi == null || bobotTotal == null) return
-    
+
     if (!savedReport || savedReport.no_batch !== noBatch.trim()) {
       setSaveError('⚠️ Simpan laporan terlebih dahulu sebelum export PDF')
       return
     }
-    
     if (dataChanged) {
       setSaveError('⚠️ Data telah diubah. Simpan ulang sebelum export PDF')
       return
     }
-    
+
     const createdBy = user?.full_name || user?.username || 'User'
     const dateStr = formatDateForFilename(tglPembuatan)
     const filename = `Calculation_Batch_Overfilled_${dateStr}`
@@ -490,17 +467,16 @@ export default function BatchOverfilledPage() {
 
     const rowIsiDiBarisIni = `
       <tr>
-        <td colspan="2" class="label green-label">Hasil Batching </td>
+        <td colspan="2" class="label green-label">Hasil Batching</td>
         ${materials.map((_, i) => {
           if (i < directCount) {
             return `<td class="num green-cell">${getValue(parseFloat(inputRaws[i]))}</td>`
-          } else {
-            return `<td class="num green-cell">${getValue(hasilBatching[i])}</td>`
           }
+          return `<td class="num green-cell">${getValue(hasilBatching[i])}</td>`
         }).join('')}
       </tr>
       <tr>
-        <td colspan="2" class="label bold">Bobot Total </td>
+        <td colspan="2" class="label bold">Bobot Total</td>
         <td class="num bold green-cell" colspan="${materials.length}">${getValue(bobotTotal)}</td>
       </tr>`
 
@@ -536,11 +512,8 @@ export default function BatchOverfilledPage() {
 
     const syaratRows = materials.map((rowMat, i) => {
       const isPivot = i === pivotIndex
-      
       const checkCells = materials.map((_, j) => {
-        if (i === j) {
-          return `<td class="num">1</td>`
-        }
+        if (i === j) return `<td class="num">1</td>`
         const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
         if (th) {
           const minVal = parseFloat(th.min_ratio.toFixed(3)).toString()
@@ -549,10 +522,10 @@ export default function BatchOverfilledPage() {
         }
         return `<td class="num text-gray-400">-</td>`
       }).join('')
-      
+
       const cr = criteriaResults[i]
       const statusColor = cr?.status === 'MS' ? 'text-green-500' : 'text-red-500'
-      
+
       return `
         <tr>
           <td colspan="2" class="label">Overfilled ${rowMat.label}${isPivot ? ' ⭐' : ''} <span class="${statusColor}">(${cr?.status || 'TMS'})</span></td>
@@ -699,7 +672,7 @@ export default function BatchOverfilledPage() {
             Perhitungan Batch Overfilled
           </h1>
           {latestReport && (
-            <span className={cn('text-xs ml-2 px-2 py-1 rounded', 
+            <span className={cn('text-xs ml-2 px-2 py-1 rounded',
               isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
             )}>
               Terakhir: {new Date(latestReport.created_at).toLocaleString('id-ID')}
@@ -708,8 +681,21 @@ export default function BatchOverfilledPage() {
           )}
         </div>
         <p className={cn('text-sm ml-12', isDark ? 'text-gray-400' : 'text-gray-500')}>
-          Pilih kode produk, isi No. Batch, lalu isi nilai di bagian berwarna hijau
+          {canCalculateBO
+            ? 'Pilih kode produk, isi No. Batch, lalu isi nilai di bagian berwarna hijau'
+            : 'Anda hanya dapat melihat perhitungan. Tidak dapat mengisi atau menyimpan.'}
         </p>
+
+        {isViewOnly && (
+          <div className={cn('rounded-lg p-3 mt-3 border flex items-center gap-2',
+            isDark ? 'bg-amber-900/20 border-amber-700 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-800'
+          )}>
+            <AlertCircle size={16} className="flex-shrink-0" />
+            <span className="text-xs">
+              Role <b>{user?.role === 'ts' ? `TS ${user.jabatan?.toUpperCase() || ''}` : user?.role?.toUpperCase()}</b> hanya dapat melihat perhitungan Batch Overfilled. Tidak dapat menghitung, menyimpan, atau membuat perhitungan baru.
+            </span>
+          </div>
+        )}
       </div>
 
       <div className={cn('rounded-xl p-5 mb-5 shadow-sm', card)}>
@@ -741,7 +727,21 @@ export default function BatchOverfilledPage() {
       )}
 
       {product && !loadingProduct && (
-        <div className="mb-4 flex justify-end gap-3">
+        <div className="mb-4 flex justify-between gap-3 flex-wrap">
+          {canCalculateBO ? (
+            <button
+              onClick={handleCreateNew}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all',
+                'bg-brand-green hover:bg-brand-green/90 text-white'
+              )}
+            >
+              <Plus size={16} />
+              Buat Perhitungan Baru
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={() => {
               loadHistory()
@@ -798,11 +798,13 @@ export default function BatchOverfilledPage() {
                           inputMode="decimal"
                           placeholder="0"
                           value={inputRaws[i] ?? ''}
+                          disabled={!canCalculateBO}
                           onChange={e => {
+                            if (!canCalculateBO) return
                             setInputRaws(prev => prev.map((v, idx) => idx === i ? e.target.value : v))
-                            setDataChanged(true)  
+                            setDataChanged(true)
                           }}
-                          className={greenInput}
+                          className={cn(greenInput, !canCalculateBO && 'opacity-60 cursor-not-allowed')}
                         />
                       </td>
                     ))}
@@ -812,11 +814,13 @@ export default function BatchOverfilledPage() {
                         inputMode="decimal"
                         placeholder="0"
                         value={bobotTotalRaw}
+                        disabled={!canCalculateBO}
                         onChange={e => {
+                          if (!canCalculateBO) return
                           setBobotTotalRaw(e.target.value)
-                          setDataChanged(true)  
+                          setDataChanged(true)
                         }}
-                        className={greenInput}
+                        className={cn(greenInput, !canCalculateBO && 'opacity-60 cursor-not-allowed')}
                       />
                     </td>
                   </tr>
@@ -913,7 +917,7 @@ export default function BatchOverfilledPage() {
                     const isPivot = i === pivotIndex
                     const cr = criteriaResults[i]
                     const statusColor = cr?.status === 'MS' ? 'text-green-500' : 'text-red-500'
-                    
+
                     return (
                       <tr key={i} className={cn('border-b', isDark ? 'border-gray-700/50' : 'border-gray-100')}>
                         <td className={cn('px-3 py-2.5 text-sm whitespace-nowrap min-w-[180px]', isDark ? 'text-gray-300' : 'text-gray-600')}>
@@ -925,9 +929,7 @@ export default function BatchOverfilledPage() {
                         {materials.map((_, j) => {
                           if (i === j) {
                             return (
-                              <td key={j} className="px-3 py-2 text-center text-gray-400 whitespace-nowrap">
-                                1
-                              </td>
+                              <td key={j} className="px-3 py-2 text-center text-gray-400 whitespace-nowrap">1</td>
                             )
                           }
                           const th = thresholds.find(t => t.criteria_index === i && t.target_index === j)
@@ -936,16 +938,12 @@ export default function BatchOverfilledPage() {
                             const maxVal = parseFloat(th.max_ratio.toFixed(3)).toString()
                             return (
                               <td key={j} className="px-3 py-2 text-center whitespace-nowrap">
-                                <span className="text-gray-600 dark:text-gray-400">
-                                  {minVal} - {maxVal}
-                                </span>
+                                <span className="text-gray-600 dark:text-gray-400">{minVal} - {maxVal}</span>
                               </td>
                             )
                           }
                           return (
-                            <td key={j} className="px-3 py-2 text-center text-gray-400 whitespace-nowrap">
-                              -
-                            </td>
+                            <td key={j} className="px-3 py-2 text-center text-gray-400 whitespace-nowrap">-</td>
                           )
                         })}
                       </tr>
@@ -959,9 +957,9 @@ export default function BatchOverfilledPage() {
                     <td className="px-3 py-2" colSpan={materials.length}>
                       <div className={cn(
                         'text-center font-bold text-base py-1 px-4 rounded-lg',
-                        allFilled 
-                          ? kesimpulan === 'MS' 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                        allFilled
+                          ? kesimpulan === 'MS'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                             : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                           : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
                       )}>
@@ -1002,7 +1000,7 @@ export default function BatchOverfilledPage() {
 
           <div className={cn('rounded-xl p-5 shadow-sm', card)}>
             <h2 className={cn('text-sm font-semibold mb-4', isDark ? 'text-gray-200' : 'text-gray-700')}>
-              Simpan & Export
+              Simpan &amp; Export
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -1013,12 +1011,14 @@ export default function BatchOverfilledPage() {
                 <input
                   type="text"
                   value={noBatch}
+                  disabled={!canCalculateBO}
                   onChange={e => {
+                    if (!canCalculateBO) return
                     setNoBatch(e.target.value)
-                    setDataChanged(true)  
+                    setDataChanged(true)
                   }}
                   placeholder="Contoh: BATCH-001"
-                  className={inputBase}
+                  className={cn(inputBase, !canCalculateBO && 'opacity-60 cursor-not-allowed')}
                 />
               </div>
               <div>
@@ -1028,7 +1028,7 @@ export default function BatchOverfilledPage() {
                 <input
                   type="date"
                   value={tglPembuatan}
-                  disabled  
+                  disabled
                   className={cn(inputBase, 'opacity-60 cursor-not-allowed')}
                 />
                 <p className="text-xs text-gray-400 mt-1">Otomatis tanggal hari ini</p>
@@ -1057,27 +1057,29 @@ export default function BatchOverfilledPage() {
             )}
 
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving || !allFilled || !tglPembuatan || !noBatch.trim()}
-                className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
-                  'disabled:opacity-50 disabled:cursor-not-allowed',
-                  'bg-brand-green hover:bg-brand-green/90 text-white'
-                )}
-              >
-                {saving ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Menyimpan…
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    Simpan Laporan
-                  </>
-                )}
-              </button>
+              {canCalculateBO && (
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !allFilled || !tglPembuatan || !noBatch.trim()}
+                  className={cn(
+                    'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    'bg-brand-green hover:bg-brand-green/90 text-white'
+                  )}
+                >
+                  {saving ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Menyimpan…
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Simpan Laporan
+                    </>
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={handleExportPDF}
@@ -1096,8 +1098,8 @@ export default function BatchOverfilledPage() {
 
             {allFilled && (!savedReport || dataChanged) && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                ⚠️ {dataChanged 
-                  ? 'Data telah diubah. Simpan ulang sebelum export PDF' 
+                ⚠️ {dataChanged
+                  ? 'Data telah diubah. Simpan ulang sebelum export PDF'
                   : 'Simpan laporan terlebih dahulu untuk mengaktifkan tombol Export PDF'}
               </p>
             )}
@@ -1120,16 +1122,14 @@ export default function BatchOverfilledPage() {
             if (report.detail_json) {
               try {
                 const detail: ReportDetail = JSON.parse(report.detail_json)
-                const directCount = Math.max(materials.length - 1, 0)
-                const inputs = detail.materials.slice(0, directCount).map((m: any) => 
-                  m.hasil_batching?.toString() || ''
-                )
+                const dc = Math.max(materials.length - 1, 0)
+                const inputs = detail.materials.slice(0, dc).map((m: any) => m.hasil_batching?.toString() || '')
                 setInputRaws(inputs)
                 setBobotTotalRaw(report.bobot_total?.toString() || '')
                 setNoBatch(report.no_batch || '')
                 setLatestReport(report)
                 setSavedReport(report)
-                setDataChanged(false)  
+                setDataChanged(false)
                 setShowHistory(false)
               } catch (e) {
                 console.error('Error parsing report detail:', e)
@@ -1137,12 +1137,8 @@ export default function BatchOverfilledPage() {
             }
           }}
           filterNoBatch={filterNoBatch}
-          onFilterChange={(value: string) => {
-            setFilterNoBatch(value)
-          }}
-          onRefresh={() => {
-            loadHistory()
-          }}
+          onFilterChange={(value: string) => setFilterNoBatch(value)}
+          onRefresh={() => loadHistory()}
         />
       )}
     </div>

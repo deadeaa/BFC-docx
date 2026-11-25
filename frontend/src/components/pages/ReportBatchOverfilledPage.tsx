@@ -50,7 +50,7 @@ export default function ReportBatchOverfilledPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { hasRole } = useAuth()
-  const canDelete = hasRole('admin', 'ts')
+  const canDelete = hasRole('admin')
 
   const [reports, setReports] = useState<BOReport[]>([])
   const [total, setTotal] = useState(0)

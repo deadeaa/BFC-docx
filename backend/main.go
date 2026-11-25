@@ -93,12 +93,17 @@ func main() {
 		protected.GET("/batch-overfilled/reports/product/:kode", boHandler.GetProductReports)
 		protected.GET("/batch-overfilled/reports/latest/:kode", boHandler.GetLatestReport)
 
+		protected.DELETE("/batch-khusus/reports/:id", middleware.RequireRole("admin"), bkHandler.DeleteReport)
+		protected.DELETE("/batch-overfilled/reports/:id", middleware.RequireRole("admin"), boHandler.DeleteReport)
+
 		calcGroup := protected.Group("", middleware.RequireRole("admin", "ts", "produksi", "qa", "ppic"))
 		{
 			calcGroup.POST("/batch-khusus/reports", bkHandler.CreateReport)
 			calcGroup.PUT("/batch-khusus/reports/:id", bkHandler.UpdateReport)
-			calcGroup.POST("/batch-overfilled/reports", boHandler.CreateReport)
 		}
+
+		protected.POST("/batch-overfilled/reports",
+			middleware.RequireAdminTSStaffOrProduksi(), boHandler.CreateReport)
 
 		protected.POST("/batch-khusus/reports/:id/submit",
 			middleware.RequireTSStaffOrAdmin(), bkHandler.SubmitReport)
@@ -129,9 +134,6 @@ func main() {
 
 			adminGroup.GET("/logs", logHandler.List)
 			adminGroup.GET("/logs/:id", logHandler.Detail)
-
-			adminGroup.DELETE("/batch-khusus/reports/:id", bkHandler.DeleteReport)
-			adminGroup.DELETE("/batch-overfilled/reports/:id", boHandler.DeleteReport)
 
 			adminGroup.GET("/admin/bk/products", adminHandler.ListBKProducts)
 			adminGroup.GET("/admin/bk/products/:id", adminHandler.GetBKProduct)
