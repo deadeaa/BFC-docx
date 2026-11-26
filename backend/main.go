@@ -47,7 +47,6 @@ func main() {
 	reportDownloadHandler := handlers.NewReportDownloadHandler(db)
 
 	r := gin.Default()
-
 	r.Use(middleware.ErrorHandler())
 	r.MaxMultipartMemory = 20 << 20 // 20 MB
 
@@ -77,7 +76,11 @@ func main() {
 		authGroup.GET("/me", middleware.Auth(jwtSvc), authHandler.Me)
 	}
 
-	protected := api.Group("", middleware.Auth(jwtSvc))
+	protected := api.Group("",
+		middleware.Auth(jwtSvc),
+		middleware.GuardDownloadReports(),
+		middleware.GuardReportTemplates(),
+	)
 	{
 		protected.GET("/batch-khusus/products", bkHandler.ListProducts)
 		protected.GET("/batch-khusus/products/:kode", bkHandler.GetProduct)
@@ -114,6 +117,48 @@ func main() {
 			approverGroup.POST("/batch-khusus/reports/:id/reject", bkHandler.RejectReport)
 		}
 
+		protected.POST("/reports/download/combined",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengunduh laporan",
+			),
+			reportDownloadHandler.DownloadCombinedReport)
+		protected.GET("/reports/download/:reportId",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengunduh laporan",
+			),
+			reportDownloadHandler.DownloadReport)
+		protected.POST("/reports/download",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengunduh laporan",
+			),
+			reportDownloadHandler.DownloadReportByType)
+
+		protected.GET("/admin/report-templates",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengelola template laporan",
+			),
+			reportTemplateHandler.ListTemplates)
+		protected.POST("/admin/report-templates",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengelola template laporan",
+			),
+			reportTemplateHandler.UploadTemplate)
+		protected.GET("/admin/report-templates/:id",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengelola template laporan",
+			),
+			reportTemplateHandler.GetTemplate)
+		protected.DELETE("/admin/report-templates/:id",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengelola template laporan",
+			),
+			reportTemplateHandler.DeleteTemplate)
+		protected.GET("/admin/report-templates/:id/download",
+			middleware.RequireTSStaffOrAdminWithMessage(
+				"Hanya Staff Technical Services atau Administrator yang dapat mengunduh template laporan",
+			),
+			reportTemplateHandler.DownloadTemplate)
+
 		adminGroup := protected.Group("", middleware.AdminOrTSOnly())
 		{
 			adminGroup.GET("/users/password-resets", userHandler.ListPasswordResets)
@@ -122,10 +167,6 @@ func main() {
 
 			adminGroup.POST("/users/:id/approve", userHandler.Approve)
 			adminGroup.POST("/users/:id/reject", userHandler.Reject)
-
-			adminGroup.POST("/reports/download/combined", reportDownloadHandler.DownloadCombinedReport)
-			adminGroup.GET("/reports/download/:reportId", reportDownloadHandler.DownloadReport)
-			adminGroup.POST("/reports/download", reportDownloadHandler.DownloadReportByType)
 
 			adminGroup.GET("/users", userHandler.List)
 			adminGroup.POST("/users", userHandler.Create)
@@ -146,12 +187,6 @@ func main() {
 			adminGroup.POST("/admin/bo/products", adminHandler.CreateBOProduct)
 			adminGroup.PUT("/admin/bo/products/:id", adminHandler.UpdateBOProduct)
 			adminGroup.DELETE("/admin/bo/products/:id", adminHandler.DeleteBOProduct)
-
-			adminGroup.GET("/admin/report-templates", reportTemplateHandler.ListTemplates)
-			adminGroup.POST("/admin/report-templates", reportTemplateHandler.UploadTemplate)
-			adminGroup.GET("/admin/report-templates/:id", reportTemplateHandler.GetTemplate)
-			adminGroup.DELETE("/admin/report-templates/:id", reportTemplateHandler.DeleteTemplate)
-			adminGroup.GET("/admin/report-templates/:id/download", reportTemplateHandler.DownloadTemplate)
 		}
 	}
 

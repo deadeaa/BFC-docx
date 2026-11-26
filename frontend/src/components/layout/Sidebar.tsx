@@ -70,7 +70,7 @@ export default function Sidebar() {
   const isTSStaff = user?.role === 'ts' && user?.jabatan === 'staff'
   const canAccessAdminProducts = isPureAdmin || isTSStaff
 
-  const canDownloadReport = hasRole('admin', 'ts')
+  const canDownloadReport = isPureAdmin || isTSStaff
 
   const toggleCalc = () => {
     const next = !calcOpen

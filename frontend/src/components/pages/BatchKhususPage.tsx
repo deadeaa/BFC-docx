@@ -98,12 +98,16 @@ function canApproveMGR(user: User | null, status: BKReportStatus | undefined): b
 function canRejectReport(user: User | null, status: BKReportStatus | undefined): boolean {
   if (!user) return false
   if (status !== 'waiting_spv' && status !== 'waiting_mgr') return false
-  return (
-    user.role === 'admin' ||
-    (user.role === 'ts' && (user.jabatan === 'spv' || user.jabatan === 'mgr'))
-  )
-}
 
+  const isAdmin = user.role === 'admin'
+  const isSPV = user.role === 'ts' && user.jabatan === 'spv'
+  const isMGR = user.role === 'ts' && user.jabatan === 'mgr'
+
+  if (isAdmin) return true
+  if (isSPV) return status === 'waiting_spv'
+  if (isMGR) return status === 'waiting_mgr'
+  return false
+}
 
 async function imageToDataUrl(src: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -125,8 +129,6 @@ async function imageToDataUrl(src: string): Promise<string> {
     img.src = src
   })
 }
-
-
 
 export default function BatchKhususPage() {
   const { theme } = useTheme()
@@ -166,7 +168,6 @@ export default function BatchKhususPage() {
 
   const userIsAdmin = user?.role === 'admin' || user?.role === 'ts'
 
-  
   useEffect(() => {
     api.get<ProductOption[]>('/batch-khusus/products')
       .then(res => setProductList(res.data))
@@ -203,7 +204,6 @@ export default function BatchKhususPage() {
     setHistoryData([])
   }
 
-  
   const handleCreateNew = () => {
     setSavedReport(null)
     setApprovalInfo(null)
@@ -260,7 +260,7 @@ export default function BatchKhususPage() {
           setDataChanged(false)
         }
       } catch {
-        
+       
       }
 
       await loadHistory(kode)
@@ -271,7 +271,6 @@ export default function BatchKhususPage() {
     }
   }, [loadHistory])
 
-  
   useEffect(() => {
     const kode = searchParams.get('kode')
     const reportId = searchParams.get('report')
@@ -317,7 +316,6 @@ export default function BatchKhususPage() {
     
   }, [searchParams])
 
-  
   const d5 = parseFloat(inputRaw) || 0
 
   function computeMaterialValues(): number[] {
@@ -357,7 +355,6 @@ export default function BatchKhususPage() {
     if (selectedKode && showHistory) loadHistory(selectedKode)
   }, [filterNoBatch, selectedKode, showHistory, loadHistory])
 
-  
   async function handleSave() {
     if (!product) {
       setSaveError('Pilih produk terlebih dahulu.')
@@ -409,7 +406,6 @@ export default function BatchKhususPage() {
     }
   }
 
-  
   async function handleSubmitApproval() {
     if (!savedReport) {
       setActionError('Simpan laporan terlebih dahulu')
@@ -435,7 +431,6 @@ export default function BatchKhususPage() {
     }
   }
 
-  
   async function handleApprove() {
     if (!savedReport) return
     setSubmitting(true)
@@ -461,7 +456,6 @@ export default function BatchKhususPage() {
     }
   }
 
-  
   async function handleReject() {
     if (!savedReport || !rejectNote.trim()) {
       setActionError('Catatan penolakan wajib diisi')
@@ -490,7 +484,6 @@ export default function BatchKhususPage() {
     }
   }
 
-  
   const isExportable =
     !!product &&
     d5 > 0 &&
@@ -694,7 +687,6 @@ ${approvalStamp}
     win.onload = () => { win.print() }
   }
 
-  
   const card = isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
 
   const inputBase = cn(
@@ -732,7 +724,9 @@ ${approvalStamp}
     (user?.role === 'ts' && user?.jabatan === 'staff') ||
     user?.role === 'produksi'
 
-  
+  const isMGRWaitingSPV =
+    user?.role === 'ts' && user.jabatan === 'mgr' && reportStatus === 'waiting_spv'
+
   return (
     <div className={cn('min-h-full p-6', isDark ? 'bg-gray-900' : 'bg-brand-bg')}>
       <div className="mb-6">
@@ -763,6 +757,17 @@ ${approvalStamp}
             <AlertCircle size={16} className="flex-shrink-0" />
             <span className="text-xs">
               Role <b>{user.role.toUpperCase()}</b> hanya dapat melihat perhitungan Batch Khusus. Tidak dapat menghitung, menyimpan, atau membuat perhitungan baru.
+            </span>
+          </div>
+        )}
+
+        {isMGRWaitingSPV && (
+          <div className={cn('rounded-lg p-3 mt-3 border flex items-center gap-2',
+            isDark ? 'bg-blue-900/20 border-blue-700 text-blue-300' : 'bg-blue-50 border-blue-300 text-blue-800'
+          )}>
+            <AlertCircle size={16} className="flex-shrink-0" />
+            <span className="text-xs">
+              Perhitungan ini <b>masih dalam review Supervisor (SPV)</b>. Tombol Approve dan Reject sebagai Manager baru aktif setelah SPV menyetujui.
             </span>
           </div>
         )}

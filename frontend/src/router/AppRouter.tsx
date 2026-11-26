@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '../context/AuthContext'
 import { ThemeProvider } from '../context/ThemeContext'
 import RequireAuth from '../components/RequireAuth'
+import RequireAdminOrStaff from '../components/RequireAdminOrStaff'
 import IdleTimeoutWatcher from '../components/IdleTimeoutWatcher'
 import Layout from '../components/layout/Layout'
 import LoginPage from '../components/pages/LoginPage'
@@ -54,21 +55,21 @@ export default function AppRouter() {
             <Route
               path="/admin/batch-khusus"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAdminOrStaff>
                   <Layout>
                     <AdminBatchKhususPage />
                   </Layout>
-                </RequireAuth>
+                </RequireAdminOrStaff>
               }
             />
             <Route
               path="/admin/batch-overfilled"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAdminOrStaff>
                   <Layout>
                     <AdminBatchOverfilledPage />
                   </Layout>
-                </RequireAuth>
+                </RequireAdminOrStaff>
               }
             />
 
@@ -117,28 +118,29 @@ export default function AppRouter() {
             <Route
               path="/admin/report-templates"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAdminOrStaff>
                   <Layout>
                     <AdminReportTemplatePage />
                   </Layout>
-                </RequireAuth>
+                </RequireAdminOrStaff>
               }
             />
 
             <Route
               path="/download-report"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAdminOrStaff>
                   <Layout>
                     <DownloadReportPage />
                   </Layout>
-                </RequireAuth>
+                </RequireAdminOrStaff>
               }
             />
+
             <Route
               path="/users"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAuth roles={['admin']}>
                   <Layout>
                     <UsersPage />
                   </Layout>
@@ -148,7 +150,7 @@ export default function AppRouter() {
             <Route
               path="/log-aktivitas"
               element={
-                <RequireAuth roles={['admin', 'ts']}>
+                <RequireAuth roles={['admin']}>
                   <Layout>
                     <LogAktivitasPage />
                   </Layout>
